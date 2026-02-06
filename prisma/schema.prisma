@@ -1,0 +1,214 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  OWNER
+  MANAGER
+  CASHIER
+}
+
+enum TransactionType {
+  SALE
+  RETURN
+  ADJUSTMENT
+  PURCHASE
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MOBILE_MONEY
+  CREDIT
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  role          UserRole @default(CASHIER)
+  password      String
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  sales         Sale[]
+  stockCounts   StockCount[]
+  adjustments   StockAdjustment[]
+  shifts        Shift[]
+  
+  @@index([email])
+  @@index([role])
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  products    Product[]
+  
+  @@index([name])
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  sku             String   @unique
+  barcode         String?  @unique
+  categoryId      String
+  costPrice       Decimal  @db.Decimal(10, 2)
+  sellingPrice    Decimal  @db.Decimal(10, 2)
+  currentStock  Decimal  @default(0)
+  reorderLevel  Decimal  @default(0) 
+  unit            String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  category        Category @relation(fields: [categoryId], references: [id])
+  saleItems       SaleItem[]
+  stockCounts     StockCount[]
+  adjustments     StockAdjustment[]
+  
+  @@index([sku])
+  @@index([barcode])
+  @@index([categoryId])
+  @@index([currentStock])
+}
+
+model Sale {
+  id              String        @id @default(cuid())
+  saleNumber      String        @unique
+  userId          String
+  customerName    String?
+  paymentMethod   PaymentMethod
+  subtotal        Decimal       @db.Decimal(10, 2)
+  tax             Decimal       @db.Decimal(10, 2) @default(0)
+  discount        Decimal       @db.Decimal(10, 2) @default(0)
+  total           Decimal       @db.Decimal(10, 2)
+  amountPaid      Decimal       @db.Decimal(10, 2)
+  change          Decimal       @db.Decimal(10, 2) @default(0)
+  notes           String?
+  createdAt       DateTime      @default(now())
+  
+  user            User          @relation(fields: [userId], references: [id])
+  items           SaleItem[]
+  
+  @@index([saleNumber])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([paymentMethod])
+}
+
+model SaleItem {
+  id              String   @id @default(cuid())
+  saleId          String
+  productId       String
+  quantity        Decimal  @db.Decimal(10, 2)
+  unitPrice       Decimal  @db.Decimal(10, 2)
+  subtotal        Decimal  @db.Decimal(10, 2)
+  
+  sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id])
+  
+  @@index([saleId])
+  @@index([productId])
+}
+
+model StockCount {
+  id              String   @id @default(cuid())
+  productId       String
+  userId          String
+  expectedQty     Decimal  @db.Decimal(10, 2)
+  actualQty       Decimal  @db.Decimal(10, 2)
+  variance        Decimal  @db.Decimal(10, 2)
+  notes           String?
+  countDate       DateTime @default(now())
+  
+  product         Product  @relation(fields: [productId], references: [id])
+  user            User     @relation(fields: [userId], references: [id])
+  
+  @@index([productId])
+  @@index([userId])
+  @@index([countDate])
+}
+
+model StockAdjustment {
+  id              String          @id @default(cuid())
+  productId       String
+  userId          String
+  type            TransactionType
+  quantity        Decimal  @db.Decimal(10, 2)
+  reason          String
+  notes           String?
+  createdAt       DateTime        @default(now())
+  
+  product         Product         @relation(fields: [productId], references: [id])
+  user            User            @relation(fields: [userId], references: [id])
+  
+  @@index([productId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([type])
+}
+
+model DailySummary {
+  id                  String   @id @default(cuid())
+  date                DateTime @unique @db.Date
+  totalSales          Decimal  @db.Decimal(10, 2)
+  totalCost           Decimal  @db.Decimal(10, 2)
+  grossProfit         Decimal  @db.Decimal(10, 2)
+  recordedSales       Decimal  @db.Decimal(10, 2)
+  estimatedSales      Decimal  @db.Decimal(10, 2)
+  cashSales           Decimal  @db.Decimal(10, 2)
+  cardSales           Decimal  @db.Decimal(10, 2)
+  mobilePayments      Decimal  @db.Decimal(10, 2)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([date])
+}
+
+model Shift {
+  id              String   @id @default(cuid())
+  userId          String
+  startTime       DateTime
+  endTime         DateTime?
+  openingCash     Decimal  @db.Decimal(10, 2)
+  closingCash     Decimal? @db.Decimal(10, 2)
+  expectedCash    Decimal? @db.Decimal(10, 2)
+  variance        Decimal? @db.Decimal(10, 2)
+  notes           String?
+  
+  user            User     @relation(fields: [userId], references: [id])
+  
+  @@index([userId])
+  @@index([startTime])
+}
+
+model Settings {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  value           String
+  description     String?
+  updatedAt       DateTime @updatedAt
+  
+  @@index([key])
+}
+
