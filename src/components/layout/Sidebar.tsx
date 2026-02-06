@@ -14,7 +14,7 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { User } from '@/lib/auth';
+import type { User } from '@/types';
 
 interface NavItem {
   href: string;

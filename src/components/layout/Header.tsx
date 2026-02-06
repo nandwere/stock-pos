@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, LogOut, User, ChevronDown } from 'lucide-react';
-import type { User as UserType } from '@/lib/auth';
+import type { User as UserType } from '@/types';
 
 interface HeaderProps {
   user: UserType;

@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { formatCurrency } from '@/lib/stock-calculations';
 import { useInventoryStore } from '@/lib/stores/inventory-store';
 import { useCategories, useCreateProduct } from '@/lib/hooks/use-products';
+import { Category } from '@/types';
 // import { useToast } from '@/lib/hooks/use-toast';
 
 interface FormData {
@@ -35,7 +36,7 @@ const UNITS = ['pcs', 'kg', 'g', 'L', 'mL', 'm', 'cm', 'box', 'pack', 'bottle'];
 export default function AddProductPage() {
   const router = useRouter();
   const createProduct = useCreateProduct();
-  const { data: categories = [], isLoading, error } = useCategories();
+  const { data: categories = [], } = useCategories() as { data: Category[] };
   // const { toast } = useToast();
 
   const [isSubmitting, setIsSubmitting] = useState(false);

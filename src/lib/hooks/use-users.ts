@@ -56,17 +56,6 @@ export function useUsers() {
   return useQuery({
     queryKey: ['users'],
     queryFn: fetchUsers,
-
-    onSuccess: (data) => {
-      setUsers(data);
-      setLoading(false);
-      setError(null);
-    },
-    onError: (error: Error) => {
-      console.error(error);
-      setError(error.message);
-      setLoading(false);
-    },
   });
 }
 

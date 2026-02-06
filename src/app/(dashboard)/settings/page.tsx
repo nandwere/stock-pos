@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useUsers } from '@/lib/hooks/use-users';
+import { User } from '@/types';
 
 interface Settings {
     // Business Info
@@ -513,8 +514,9 @@ function NotificationSettings({ settings, setSettings }: any) {
 }
 
 // User Management Section
+
 function UserManagementSettings() {
-    const { data: users = [], isLoading, error } = useUsers();
+    const { data: users = [] } = useUsers() as { data: User[] };
 
     return (
         <div className="space-y-6">

@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { formatCurrency } from '@/lib/stock-calculations';
 import { useUserStore } from '@/lib/stores/user-store';
 // import { useToast } from '@/lib/hooks/use-toast';
-import { UserRole } from '@/lib/auth';
+import { UserRole } from '@/types';
 import { useCreateUser } from '@/lib/hooks/use-users';
 
 interface FormData {

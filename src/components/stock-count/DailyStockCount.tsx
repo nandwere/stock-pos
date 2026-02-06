@@ -12,7 +12,7 @@ import {
   Calculator} from 'lucide-react';
 import { calculateStockVariance, formatCurrency } from '@/lib/stock-calculations';
 import { useProducts } from '@/lib/hooks/use-products';
-import { StockCountEntry } from '@/types';
+import { Product, StockCountEntry } from '@/types';
 import { useCreateStockCount } from '@/lib/hooks/use-stock-count';
 
 
@@ -21,7 +21,7 @@ export function DailyStockCount() {
   const [entries, setEntries] = useState<StockCountEntry[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showSummary, setShowSummary] = useState(false);
-  const { data: products = [], isLoading, error } = useProducts();
+  const { data: products = [], isLoading, error } = useProducts() as { data: Product[], isLoading: boolean, error: any };
   const createStockCount = useCreateStockCount();
 
   // Load products and today's sales data
@@ -128,7 +128,7 @@ export function DailyStockCount() {
   const categories = ['all', ...new Set(products.map(p => p.category))];
   const filteredEntries = selectedCategory === 'all'
     ? entries
-    : entries.filter(e => e.product.category === selectedCategory);
+    : entries.filter(e => e.product.category?.name === selectedCategory);
 
   return (
     <div className="max-w-9xl mx-auto p-6 space-y-6">
@@ -240,14 +240,14 @@ export function DailyStockCount() {
             <span className="text-sm font-medium text-gray-700">Category:</span>
             {categories.map(category => (
               <button
-                key={category.id}
-                onClick={() => setSelectedCategory(category)}
+                key={category.toString()}
+                onClick={() => setSelectedCategory(category.toString())}
                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedCategory === category
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
               >
-                {category === 'all' ? 'All' : category.name}
+                {category === 'all' ? 'All' : category.toString() || ''}
               </button>
             ))}
           </div>

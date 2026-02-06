@@ -19,6 +19,7 @@ import { usePOSStore } from '@/lib/stores/pos-store';
 import { useProducts } from '@/lib/hooks/use-products';
 import { useCreateSale } from '@/lib/hooks/use-sales';
 import { formatCurrency } from '@/lib/stock-calculations';
+import { Product } from '@/types';
 
 export function POSInterface() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,7 +34,7 @@ export function POSInterface() {
   const getCartTotal = usePOSStore(state => state.getCartTotal);
 
   // React Query
-  const { data: products = [], isLoading, error } = useProducts();
+  const { data: products = [], isLoading, error } = useProducts() as { data: Product[], isLoading: boolean, error: any };
   const createSale = useCreateSale();
 
   const totals = getCartTotal();

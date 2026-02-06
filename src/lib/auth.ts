@@ -4,23 +4,7 @@ import { redirect } from 'next/navigation';
 import { jwtVerify, SignJWT } from 'jose';
 import bcrypt from 'bcryptjs';
 import { prisma } from './prisma';
-
-export type UserRole = 'OWNER' | 'MANAGER' | 'CASHIER';
-
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: UserRole;
-  isActive: boolean;
-}
-
-export interface SessionPayload {
-  userId: string;
-  email: string;
-  role: UserRole;
-  expiresAt: Date;
-}
+import { SessionPayload, User, UserRole } from '@/types';
 
 const secret = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-secret-key-change-in-production'

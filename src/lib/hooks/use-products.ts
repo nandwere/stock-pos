@@ -67,16 +67,6 @@ export function useProducts() {
   return useQuery({
     queryKey: ['products'],
     queryFn: fetchProducts,
-    onSuccess: (data: any) => {
-      setProducts(data);
-      setLoading(false);
-      setError(null);
-    },
-    onError: (error: Error) => {
-      console.error(error);
-      setError(error.message);
-      setLoading(false);
-    },
   });
 }
 
@@ -92,17 +82,6 @@ export function useCategories() {
   return useQuery({
     queryKey: ['categories'],
     queryFn: fetchCategories,
-
-    onSuccess: (data) => {
-      setCategories(data);
-      setLoadingCategories(false);
-      setError(null);
-    },
-    onError: (error: Error) => {
-      console.error(error);
-      setError(error.message);
-      setLoadingCategories(false);
-    },
   });
 }
 

@@ -4,12 +4,12 @@ import { prisma } from '@/lib/prisma';
 import { hasPermission, getCurrentUser } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await hasPermission('users.view'))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   try {
-    const id = params.id;
+    const { id } = await params;
     const user = await prisma.user.findUnique({
       where: { id },
       select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
@@ -22,12 +22,12 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await hasPermission('users.edit'))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   try {
-    const id = params.id;
+    const { id } = await params;
     const body = await request.json();
     const data: any = {};
 
@@ -49,12 +49,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await hasPermission('users.delete'))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   try {
-    const id = params.id;
+    const { id } = await params;
 
     // Prevent deleting yourself
     const current = await getCurrentUser();
