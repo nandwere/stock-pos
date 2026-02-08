@@ -97,7 +97,7 @@ export default function AddProductPage() {
       newErrors.sellingPrice = 'Selling price cannot be less than cost price';
     }
 
-    if (formData.currentStock === '' || parseInt(formData.currentStock) < 0) {
+    if (formData.currentStock === '' || parseFloat(formData.currentStock) < 0) {
       newErrors.currentStock = 'Valid stock quantity is required';
     }
 
@@ -145,7 +145,7 @@ export default function AddProductPage() {
         category: formData.category,
         costPrice: parseFloat(formData.costPrice),
         sellingPrice: parseFloat(formData.sellingPrice),
-        currentStock: parseInt(formData.currentStock),
+        currentStock: parseFloat(formData.currentStock),
         reorderLevel: parseInt(formData.reorderLevel),
         unit: formData.unit,
         description: formData.description,
@@ -457,6 +457,7 @@ export default function AddProductPage() {
                   <input
                     type="number"
                     min="0"
+                    step={'0.01'}
                     value={formData.currentStock}
                     onChange={(e) => handleChange('currentStock', e.target.value)}
                     className={`w-full px-4 py-2 border text-gray-900 placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.currentStock ? 'border-red-500' : 'border-gray-300'
