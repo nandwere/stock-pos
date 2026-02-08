@@ -16,11 +16,12 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/stock-calculations';
 import Link from 'next/link';
-import { useProducts } from '@/lib/hooks/use-products';
+import { useCategories, useProducts } from '@/lib/hooks/use-products';
 import { useInventoryStore } from '@/lib/stores/inventory-store';
-import { Product } from '@/types';
+import { Category, Product } from '@/types';
 
 export function InventoryList() {
+  const { data: categories = [], } = useCategories() as { data: Category[] };
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'out'>('all');
   const { data: products = [], isLoading, error } = useProducts() as { data: Product[], isLoading: boolean, error: any };
@@ -32,11 +33,10 @@ export function InventoryList() {
 
   // Apply filters
   const filteredProducts = getFilteredProducts();
-  const categories = ['all', ...new Set((products).map(p => p.category))];
 
   // Calculate totals
   const totalValue = products.reduce((sum, p) => Number(sum) + (Number(p.currentStock) * Number(p.costPrice)), 0);
-  const lowStockCount = products.filter(p => p.currentStock <= p.reorderLevel && p.currentStock > 0).length;
+  const lowStockCount = products.filter(p => Number(p.currentStock) <= Number(p.reorderLevel) && Number(p.currentStock) > 0).length;
   const outOfStockCount = products.filter(p => p.currentStock === 0).length;
 
   if (isLoading) return <div>Loading...</div>;
@@ -222,7 +222,7 @@ export function InventoryList() {
                         <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
                           Out of Stock
                         </span>
-                      ) : product.currentStock <= product.reorderLevel ? (
+                      ) : (Number(product.currentStock) || 0) <= (Number(product.reorderLevel) || 0)? (
                         <span className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
                           Low Stock
                         </span>

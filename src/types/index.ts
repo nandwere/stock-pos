@@ -77,3 +77,46 @@ export interface StockCountEntry {
   estimatedRevenue: number | null;
   notes: string;
 }
+
+// types/stock-adjustment.ts
+export enum TransactionType {
+  ADJUSTMENT_ADD = 'ADJUSTMENT_ADD',
+  ADJUSTMENT_REMOVE = 'ADJUSTMENT_REMOVE',
+  DAMAGE = 'DAMAGE',
+  THEFT = 'THEFT',
+  EXPIRY = 'EXPIRY',
+  CORRECTION = 'CORRECTION',
+  RETURN = 'RETURN',
+  SAMPLE = 'SAMPLE'
+}
+
+export interface StockAdjustment {
+  id: string;
+  productId: string;
+  userId: string;
+  type: TransactionType;
+  quantity: number;
+  reason: string;
+  notes?: string;
+  createdAt: Date;
+  
+  // Relations
+  product: Product;
+  user: User;
+}
+
+export interface CreateAdjustmentDTO {
+  productId: string;
+  type: TransactionType;
+  quantity: number;
+  reason: string;
+  notes?: string;
+}
+
+export interface AdjustmentFilters {
+  productId?: string;
+  type?: TransactionType;
+  startDate?: string;
+  endDate?: string;
+  userId?: string;
+}

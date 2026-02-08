@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Save,
@@ -13,9 +13,11 @@ import {
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/stock-calculations';
 import { useInventoryStore } from '@/lib/stores/inventory-store';
-import { useCategories, useCreateProduct } from '@/lib/hooks/use-products';
+import { useCategories, useCreateProduct, useProduct, useUpdateProduct } from '@/lib/hooks/use-products';
 import { Category } from '@/types';
-// import { useToast } from '@/lib/hooks/use-toast';
+import { useToast } from '../ui/toast-provider';
+import { useQuery } from '@tanstack/react-query';
+import Loading from '@/app/(dashboard)/inventory/[id]/edit/loading';
 
 interface FormData {
   name: string;
@@ -34,26 +36,34 @@ interface FormData {
 const UNITS = ['pcs', 'kg', 'g', 'L', 'mL', 'm', 'cm', 'box', 'pack', 'bottle'];
 
 export default function AddProductPage() {
+  const params = useParams();
   const router = useRouter();
   const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
   const { data: categories = [], } = useCategories() as { data: Category[] };
-  // const { toast } = useToast();
+  const productId = params.id as string;
+
+  const { data: product, isLoading: isProductLoading } = useProduct(productId);
+
+  const isNew = !productId;
+
+  const { toast } = useToast();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
 
   const [formData, setFormData] = useState<FormData>({
-    name: '',
-    sku: '',
-    barcode: '',
-    category: '',
-    costPrice: '',
-    sellingPrice: '',
-    currentStock: '',
-    reorderLevel: '5',
-    unit: 'pcs',
-    description: '',
-    isActive: true
+    name: product?.name || '',
+    sku: product?.sku || '',
+    barcode: product?.barcode || '',
+    category: product?.category?.id || '',
+    costPrice: product?.costPrice?.toString() || '',
+    sellingPrice: product?.sellingPrice?.toString() || '',
+    currentStock: product?.currentStock?.toString() || '',
+    reorderLevel: product?.reorderLevel?.toString() || '5',
+    unit: product?.unit || 'pcs',
+    description: product?.description || '',
+    isActive: product?.isActive !== undefined ? product.isActive : true
   });
 
   const [showMarginWarning, setShowMarginWarning] = useState(false);
@@ -71,11 +81,6 @@ export default function AddProductPage() {
     if (!formData.name.trim()) {
       newErrors.name = 'Product name is required';
     }
-
-    // if (!formData.sku.trim()) {
-    //   newErrors.sku = 'SKU is required';
-    // }
-
     if (!formData.category) {
       newErrors.category = 'Category is required';
     }
@@ -113,11 +118,11 @@ export default function AddProductPage() {
 
     if (!validateForm()) {
       console.log('Invalid Form');
-      // toast({
-      //   title: 'Validation Error',
-      //   description: 'Please check the form for errors',
-      //   type: 'destructive'
-      // });
+      toast({
+        title: 'Validation Error',
+        description: 'Please check the form for errors',
+        variant: 'destructive'
+      });
       return;
     }
 
@@ -132,6 +137,7 @@ export default function AddProductPage() {
 
     try {
       const newProduct = {
+        ...(!isNew ? product : {}),
         id: Date.now().toString(),
         name: formData.name,
         sku: formData.sku,
@@ -148,25 +154,46 @@ export default function AddProductPage() {
         updatedAt: new Date().toISOString()
       };
 
-      createProduct.mutateAsync(newProduct);
+      isNew && createProduct.mutateAsync(newProduct).then(() => {
+        toast({
+          title: 'Product Added`',
+          description: `${formData.name} has been updated successfully`,
+          variant: 'default'
+        });
+        router.push('/inventory');
+        router.refresh();
+      }).catch((err) => {
+        console.error('Error creating product:', err);
+        toast({
+          title: 'Error',
+          description: 'Failed to add product. Please try again.',
+          variant: 'destructive'
+        });
+      });
 
-      // toast({
-      //   title: 'Product Added',
-      //   description: `${formData.name} has been added successfully`,
-      //   type: 'default'
-      // });
-
-      // Redirect to inventory list
-      router.push('/inventory');
-      router.refresh();
-
+      !isNew && updateProduct.mutateAsync({ id: product.id, data: newProduct }).then(() => {
+        toast({
+          title: 'Product Updated',
+          description: `${formData.name} has been updated successfully`,
+          variant: 'default'
+        });
+        // Redirect to inventory list
+        router.push('/inventory');
+        router.refresh();
+      }).catch(error => {
+        toast({
+          title: 'Error',
+          description: 'Failed to update product. Please try again.',
+          variant: 'destructive'
+        });
+      });
     } catch (error) {
       console.error('Error adding product:', error);
-      // toast({
-      //   title: 'Error',
-      //   description: 'Failed to add product. Please try again.',
-      //   type: 'destructive'
-      // });
+      toast({
+        title: 'Error',
+        description: 'Failed to add product. Please try again.',
+        variant: 'destructive'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -199,6 +226,10 @@ export default function AddProductPage() {
     const barcode = '8' + Math.floor(100000000000 + Math.random() * 900000000000).toString();
     handleChange('barcode', barcode);
   };
+
+  if (isProductLoading) {
+    return <Loading />;
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -526,7 +557,7 @@ export default function AddProductPage() {
                 ) : (
                   <>
                     <Save className="w-4 h-4" />
-                    Add Product
+                    {isNew ? 'Add Product' : 'Update Product'}
                   </>
                 )}
               </button>

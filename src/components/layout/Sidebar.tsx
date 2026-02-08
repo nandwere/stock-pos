@@ -50,6 +50,11 @@ const navigationItems: NavItem[] = [
     icon: ClipboardList 
   },
   { 
+    href: '/inventory/stock-adjustments', 
+    label: 'Stock Adjustments', 
+    icon: ClipboardList 
+  },
+  { 
     href: '/reports', 
     label: 'Reports', 
     icon: BarChart3,

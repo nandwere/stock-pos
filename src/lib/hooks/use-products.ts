@@ -21,9 +21,9 @@ async function fetchCategories() {
 }
 
 async function fetchProductById(id: string) {
-  const response = await fetch(`/api/products/${id}`);
+  const response = await fetch(`/api/inventory/${id}`);
   if (!response.ok) throw new Error('Failed to fetch product');
-  return response.json();
+  return await response.json();
 }
 
 async function createProduct(data: any) {
@@ -38,7 +38,7 @@ async function createProduct(data: any) {
 
 async function updateProduct({ id, data }: { id: string; data: any }) {
   const response = await fetch(`/api/inventory/${id}`, {
-    method: 'PATCH',
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
@@ -91,7 +91,7 @@ export function useCategories() {
  */
 export function useProduct(id: string) {
   return useQuery({
-    queryKey: ['products', id],
+    queryKey: ['product-by-id', id],
     queryFn: () => fetchProductById(id),
     enabled: !!id,
   });

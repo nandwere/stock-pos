@@ -21,10 +21,14 @@ enum UserRole {
 }
 
 enum TransactionType {
+  ADJUSTMENT_ADD
+  ADJUSTMENT_REMOVE
   SALE
+  DAMAGE
+  THEFT
+  EXPIRY
+  CORRECTION
   RETURN
-  ADJUSTMENT
-  PURCHASE
 }
 
 enum PaymentMethod {
