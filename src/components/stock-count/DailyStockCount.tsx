@@ -1,7 +1,7 @@
 // components/stock-count/DailyStockCount.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Package,
   CheckCircle,
@@ -9,39 +9,88 @@ import {
   TrendingDown,
   TrendingUp,
   Save,
-  Calculator} from 'lucide-react';
+  Calculator,
+  Loader2
+} from 'lucide-react';
 import { calculateStockVariance, formatCurrency } from '@/lib/stock-calculations';
-import { useProducts } from '@/lib/hooks/use-products';
-import { Product, StockCountEntry } from '@/types';
+import { useCategories, useProducts } from '@/lib/hooks/use-products';
+import { Category, Product, StockCountEntry } from '@/types';
 import { useCreateStockCount } from '@/lib/hooks/use-stock-count';
+import { useTodaySales } from '@/lib/hooks/use-sales';
 
 
 export function DailyStockCount() {
+  const { data: categories = [], } = useCategories() as { data: Category[] };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [entries, setEntries] = useState<StockCountEntry[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showSummary, setShowSummary] = useState(false);
-  const { data: products = [], isLoading, error } = useProducts() as { data: Product[], isLoading: boolean, error: any };
+  const { data: products = [], isLoading: productsLoading } = useProducts() as {
+    data: Product[],
+    isLoading: boolean
+  };
+  const { data: todaySales = [], isLoading: salesLoading } = useTodaySales();
   const createStockCount = useCreateStockCount();
 
-  // Load products and today's sales data
-  // In real app, fetch from API
   const loadData = async () => {
-    // Simulated data
-    const mockEntries: StockCountEntry[] = products.map(product => ({
-      productId: product.id,
-      product,
-      openingStock: product.currentStock + 10, // Simulated opening
-      recordedSales: 5, // Simulated sales
-      expectedStock: product.currentStock + 10 - 5,
-      actualStock: null,
-      variance: null,
-      estimatedRevenue: null,
-      notes: ''
-    }));
+    if (products.length === 0) return;
+
+    // Calculate sales per product from today's sales
+    const salesByProduct = calculateSalesByProduct(todaySales);
+
+    // Get opening stock from database (you'll need an API for this)
+    // For now, we'll use current stock as a placeholder
+    const mockEntries: StockCountEntry[] = products.map(product => {
+      const recordedSales = salesByProduct[product.id] || 0;
+      const openingStock = Number(product.currentStock) + recordedSales;
+      const expectedStock = openingStock - recordedSales;
+
+      return {
+        productId: product.id,
+        product,
+        openingStock,
+        recordedSales,
+        expectedStock,
+        actualStock: null,
+        variance: null,
+        estimatedRevenue: null,
+        notes: ''
+      };
+    });
 
     setEntries(mockEntries);
   };
+
+  // Calculate total sales quantity per product
+  const calculateSalesByProduct = (sales: any[]) => {
+    const salesMap: Record<string, number> = {};
+
+    if (!sales || sales.length === 0) return salesMap;
+
+    sales.forEach(sale => {
+      if (sale.items && Array.isArray(sale.items)) {
+        sale.items.forEach((item: any) => {
+          const productId = item.productId || item.product_id;
+          const quantity = Number(item.quantity) || 0;
+
+          if (salesMap[productId]) {
+            salesMap[productId] += quantity;
+          } else {
+            salesMap[productId] = quantity;
+          }
+        });
+      }
+    });
+
+    return salesMap;
+  };
+
+  // Auto-load data when products and sales are available
+  useEffect(() => {
+    if (products.length > 0 && !productsLoading && entries.length === 0 && !salesLoading) {
+      loadData();
+    }
+  }, [products, todaySales, productsLoading, salesLoading]);
 
   // Update actual stock count
   const updateActualStock = (productId: string, actualStock: number) => {
@@ -111,7 +160,7 @@ export function DailyStockCount() {
       // In real app, save to API
       console.log('Saving stock count:', entries);
 
-      createStockCount.mutateAsync({counts: entries });
+      createStockCount.mutateAsync({ counts: entries });
       setShowSummary(true);
     } catch (error) {
       console.error('Error adding product:', error);
@@ -125,10 +174,23 @@ export function DailyStockCount() {
     }
   };
 
-  const categories = ['all', ...new Set(products.map(p => p.category))];
+  const allCategories = ['all', ...new Set(categories.map(p => p.name))];
   const filteredEntries = selectedCategory === 'all'
     ? entries
     : entries.filter(e => e.product.category?.name === selectedCategory);
+
+  if (productsLoading && entries.length === 0) {
+    return (
+      <div className="max-w-9xl mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Loading products and sales data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-9xl mx-auto p-6 space-y-6">
@@ -165,7 +227,7 @@ export function DailyStockCount() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={isLoading}
+                disabled={isSubmitting || entries.some(e => e.actualStock === null)}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 flex items-center gap-2 disabled:bg-gray-300"
               >
                 <Save className="w-5 h-5" />
@@ -238,10 +300,10 @@ export function DailyStockCount() {
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-gray-700">Category:</span>
-            {categories.map(category => (
+            {allCategories.map(category => (
               <button
-                key={category.toString()}
-                onClick={() => setSelectedCategory(category.toString())}
+                key={category}
+                onClick={() => setSelectedCategory(category === 'all' ? 'all' : category)}
                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedCategory === category
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

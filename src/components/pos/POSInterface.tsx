@@ -289,7 +289,7 @@ function CartItemCard({ item, onUpdateQuantity, onRemove }: any) {
             value={item.quantity}
             onChange={(e) => handleQuantityChange(parseFloat(e.target.value) || 0.0)}
             className="w-16 text-center text-gray-900 placeholder-gray-400 border border-gray-300 rounded px-2 py-1 text-sm"
-            min="0.25"
+            min="0.01"
             max={item.currentStock}
           />
           <button

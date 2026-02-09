@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { items, paymentMethod, customerName } = body;
-    
+
     console.log('Creating sale with items:', JSON.stringify(items, null, 2));
 
     // Validate stock before transaction
@@ -24,29 +24,29 @@ export async function POST(request: NextRequest) {
         where: { id: item.productId },
         select: { currentStock: true, name: true }
       });
-      
+
       if (!product) {
         return NextResponse.json(
           { error: `Product ${item.productId} not found` },
           { status: 404 }
         );
       }
-      
+
       if (product.currentStock < item.quantity) {
         return NextResponse.json(
           { error: `Insufficient stock for ${product.name}. Available: ${product.currentStock}, Requested: ${item.quantity}` },
           { status: 400 }
         );
       }
-      
+
       console.log(`Product ${product.name}: Stock ${product.currentStock}, Selling ${item.quantity}`);
     }
 
     // Calculate totals
-    const subtotal = items.reduce((sum: number, item: any) => 
+    const subtotal = items.reduce((sum: number, item: any) =>
       sum + (item.quantity * item.unitPrice), 0
     );
-    
+
     const total = subtotal;
 
     // Create sale in transaction
@@ -74,12 +74,12 @@ export async function POST(request: NextRequest) {
       });
 
       console.log('Sale created:', newSale.id);
-      
+
       // Update stock levels with individual error handling
       for (const item of items) {
         try {
           console.log(`Updating stock for product ${item.productId}, decrement by ${item.quantity}`);
-          
+
           const updated = await tx.product.update({
             where: { id: item.productId },
             data: {
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
             },
             select: { id: true, name: true, currentStock: true }
           });
-          
+
           console.log(`Stock updated for ${updated.name}: New stock = ${updated.currentStock}`);
         } catch (updateError) {
           console.error(`Failed to update product ${item.productId}:`, updateError);
@@ -136,6 +136,15 @@ export async function GET(request: NextRequest) {
     const startDate = url.searchParams.get('startDate');
     const endDate = url.searchParams.get('endDate');
 
+    console.log('Fetching sales with filters:', {
+      q,
+      paymentMethod,
+      startDate,
+      endDate,
+      take,
+      skip
+    });
+
     const where: any = {};
     if (q) {
       where.OR = [
@@ -145,8 +154,29 @@ export async function GET(request: NextRequest) {
     }
     if (paymentMethod) where.paymentMethod = paymentMethod;
     if (startDate || endDate) where.createdAt = {};
-    if (startDate) where.createdAt.gte = new Date(startDate);
-    if (endDate) where.createdAt.lte = new Date(endDate);
+    // Date range filter - IMPORTANT FIX
+    if (startDate || endDate) {
+      where.createdAt = {};
+
+      // Convert string dates to Date objects in UTC
+      if (startDate) {
+        // Parse date and set to start of day in UTC
+        const start = new Date(startDate);
+        start.setUTCHours(0, 0, 0, 0);
+        where.createdAt.gte = start;
+        console.log('Start date filter (UTC):', start.toISOString());
+      }
+
+      if (endDate) {
+        // Parse date and set to end of day in UTC
+        const end = new Date(endDate);
+        end.setUTCHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+        console.log('End date filter (UTC):', end.toISOString());
+      }
+    }
+
+    console.log('Final WHERE clause:', JSON.stringify(where, null, 2));
 
     const [sales, total] = await Promise.all([
       prisma.sale.findMany({
@@ -154,10 +184,16 @@ export async function GET(request: NextRequest) {
         include: { items: true, user: true },
         orderBy: { createdAt: 'desc' },
         take,
-        skip,
+        skip
       }),
       prisma.sale.count({ where }),
     ]);
+     console.log(`Fetched ${sales.length} sales, total matching: ${total}`);
+    console.log('Applied filters:', {
+      hasSearch: !!q,
+      hasPaymentMethod: !!paymentMethod,
+      hasDateRange: !!(startDate || endDate)
+    });
 
     return NextResponse.json({ data: sales, meta: { total } });
   } catch (error) {
