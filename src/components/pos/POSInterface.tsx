@@ -231,9 +231,9 @@ function ProductCard({ product, onAddToCart }: any) {
             {formatCurrency(product.sellingPrice)}
           </div>
           <div className="text-xs text-gray-500 mt-1">
-            {product.currentStock === 0 ? (
+            {Number(product.currentStock) === 0 ? (
               <span className="text-red-600 font-medium">Out of Stock</span>
-            ) : product.currentStock <= product.reorderLevel ? (
+            ) : Number(product.currentStock) <= Number(product.reorderLevel) ? (
               <span className="text-orange-600 font-medium">
                 Low: {product.currentStock} {product.unit}
               </span>
