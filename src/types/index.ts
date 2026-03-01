@@ -100,7 +100,7 @@ export interface StockAdjustment {
   notes?: string;
   createdAt: Date;
   
-  // Relations
+  // Relationss
   product: Product;
   user: User;
 }
@@ -119,4 +119,77 @@ export interface AdjustmentFilters {
   startDate?: string;
   endDate?: string;
   userId?: string;
+}
+
+export interface StockCountReport {
+  date: string;
+  missingStock: number;
+  excessStock: number;
+  totalVariance: number;
+}
+
+export interface StockCountEntry {
+  productId: string;
+  product: Product;
+  openingStock: number;
+  recordedSales: number;
+  expectedStock: number;
+  actualStock: number | null;
+  variance: number | null;
+  estimatedRevenue: number | null;
+  notes: string;
+}
+
+export interface StockCount {
+  id: string;
+  date: string;
+  entries: StockCountEntry[];
+  totalProducts: number;
+  countedProducts: number;
+  missingStock: number;
+  excessStock: number;
+  totalVariance: number;
+  estimatedLoss: number;
+  productsWithVariance: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StockCountReport {
+  id: string;
+  date: string;
+  productsCounted: number;
+  missingStock: number;
+  excessStock: number;
+  totalVariance: number;
+  estimatedLoss: number;
+  productsWithVariance: number;
+  accuracyRate: number;
+  expectedStock?: number;
+  actualStock?: number;
+}
+
+export interface ProductVarianceReport {
+  productId: string;
+  productName: string;
+  productSku: string;
+  categoryId: string;
+  categoryName: string;
+  totalVariance: number;
+  countOccurrences: number;
+  averageVariance: number;
+  estimatedRevenueLoss: number;
+  lastCountDate: string;
+}
+
+export interface DailyStockSummary {
+  date: string;
+  totalProducts: number;
+  perfectMatches: number;
+  missingStock: number;
+  excessStock: number;
+  totalVariance: number;
+  estimatedLoss: number;
+  accuracyRate: number;
 }

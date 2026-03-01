@@ -160,3 +160,137 @@ export function useIsStockCountComplete() {
     },
   });
 }
+
+
+/**
+ * Get stock count reports for a date range
+ */
+export function useStockCountReports(params: {
+  startDate: string;
+  endDate: string;
+}) {
+  return useQuery({
+    queryKey: ['stock-count-reports', params.startDate, params.endDate],
+    queryFn: async () => {
+      const response = await fetch(`/api/stock-count/reports`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) throw new Error('Failed to fetch stock count reports');
+      return response.json();
+    },
+    enabled: Boolean(params.startDate && params.endDate),
+  });
+}
+
+/**
+ * Get product variance report
+ */
+export function useProductVarianceReport(params: {
+  startDate: string;
+  endDate: string;
+}) {
+  return useQuery({
+    queryKey: ['product-variance-report', params.startDate, params.endDate],
+    queryFn: async () => {
+      const response = await fetch(`/api/stock-counts/product-variance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) throw new Error('Failed to fetch product variance report');
+      return response.json();
+    },
+    enabled: Boolean(params.startDate && params.endDate),
+  });
+}
+
+/**
+ * Get stock count by date
+ */
+export function useStockCountByDate(date: string) {
+  return useQuery({
+    queryKey: ['stock-count', date],
+    queryFn: async () => {
+      const response = await fetch(`/api/stock-counts/date/${date}`);
+      if (!response.ok) throw new Error('Failed to fetch stock count by date');
+      return response.json();
+    },
+    enabled: Boolean(date),
+  });
+}
+
+/**
+ * Get stock count details by ID
+ */
+export function useStockCountDetails(id: string) {
+  return useQuery({
+    queryKey: ['stock-count-details', id],
+    queryFn: async () => {
+      const response = await fetch(`/api/stock-counts/${id}`);
+      if (!response.ok) throw new Error('Failed to fetch stock count details');
+      return response.json();
+    },
+    enabled: Boolean(id),
+  });
+}
+
+/**
+ * Update stock count entry
+ */
+export function useUpdateStockCountEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      stockCountId: string;
+      entryId: string;
+      actualStock: number;
+      notes?: string;
+    }) => {
+      const response = await fetch(`/api/stock-counts/${data.stockCountId}/entries/${data.entryId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          actualStock: data.actualStock,
+          notes: data.notes,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to update stock count entry');
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['stock-count-details', variables.stockCountId],
+      });
+    },
+  });
+}
+
+/**
+ * Delete stock count
+ */
+export function useDeleteStockCount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/stock-counts/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete stock count');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-count-reports'] });
+    },
+  });
+}

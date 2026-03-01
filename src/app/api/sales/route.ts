@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { items, paymentMethod, customerName } = body;
 
-    console.log('Creating sale with items:', JSON.stringify(items, null, 2));
+    // console.log('Creating sale with items:', JSON.stringify(items, null, 2));
 
     // Validate stock before transaction
     for (const item of items) {
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      console.log(`Product ${product.name}: Stock ${product.currentStock}, Selling ${item.quantity}`);
+      // console.log(`Product ${product.name}: Stock ${product.currentStock}, Selling ${item.quantity}`);
     }
 
     // Calculate totals
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         include: { items: true }
       });
 
-      console.log('Sale created:', newSale.id);
+      // console.log('Sale created:', newSale.id);
 
       // Update stock levels with individual error handling
       for (const item of items) {
@@ -136,14 +136,14 @@ export async function GET(request: NextRequest) {
     const startDate = url.searchParams.get('startDate');
     const endDate = url.searchParams.get('endDate');
 
-    console.log('Fetching sales with filters:', {
-      q,
-      paymentMethod,
-      startDate,
-      endDate,
-      take,
-      skip
-    });
+    // console.log('Fetching sales with filters:', {
+    //   q,
+    //   paymentMethod,
+    //   startDate,
+    //   endDate,
+    //   take,
+    //   skip
+    // });
 
     const where: any = {};
     if (q) {

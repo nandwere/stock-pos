@@ -180,7 +180,7 @@ export function useProductsSearch(searchQuery: string) {
 /**
  * Get low stock products
  */
-export function useLowStockProducts() {
+export function useLowStockProducts(limit: number = 10) {
   return useQuery({
     queryKey: ['products', 'low-stock'],
     queryFn: () => fetchProducts(),
