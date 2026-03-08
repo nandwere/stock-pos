@@ -68,6 +68,25 @@ export default function AddProductPage() {
 
   const [showMarginWarning, setShowMarginWarning] = useState(false);
 
+  useEffect(() => {
+    if (product && !isProductLoading) {
+      setFormData(prev => ({
+        name: product.name,
+        sku: product?.sku,
+        barcode: product?.barcode,
+        category: product?.category?.id,
+        costPrice: product?.costPrice?.toString() || '',
+        sellingPrice: product?.sellingPrice?.toString() || '',
+        currentStock: product?.currentStock?.toString() || '',
+        reorderLevel: product?.reorderLevel?.toString() || '5',
+        unit: product?.unit || 'pcs',
+        description: product?.description || '',
+        isActive: product?.isActive !== undefined ? product.isActive : true
+      }));
+    }
+
+  }, [product])
+
   // Calculate margin
   const costPrice = parseFloat(formData.costPrice) || 0;
   const sellingPrice = parseFloat(formData.sellingPrice) || 0;
