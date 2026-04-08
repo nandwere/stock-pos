@@ -22,6 +22,7 @@ import { formatCurrency } from '@/lib/stock-calculations';
 import { Product } from '@/types';
 
 export function POSInterface() {
+  const [showCart, setShowCart] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
@@ -38,8 +39,6 @@ export function POSInterface() {
   const createSale = useCreateSale();
 
   const totals = getCartTotal();
-
-  console.log(totals);
 
   const handleCompleteSale = async (paymentData: any) => {
     try {
@@ -67,7 +66,7 @@ export function POSInterface() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100">
       {/* Left Side - Products */}
       <div className="flex-1 flex flex-col">
         {/* Search Bar */}
@@ -86,7 +85,7 @@ export function POSInterface() {
         </div>
 
         {/* Products Grid */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 flex flex-col min-w-0">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -100,7 +99,7 @@ export function POSInterface() {
               <p className="text-gray-500">No products found</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {products.map((product: any) => (
                 <ProductCard
                   key={product.id}
@@ -112,9 +111,15 @@ export function POSInterface() {
           )}
         </div>
       </div>
+      <button
+        onClick={() => setShowCart(true)}
+        className="fixed bottom-4 right-4 md:hidden bg-blue-600 text-white p-4 rounded-full shadow-lg z-50"
+      >
+        <ShoppingCart className="w-6 h-6" />
+      </button>
 
       {/* Right Side - Cart */}
-      <div className="w-96 bg-white border-l flex flex-col pb-20">
+      <div className="hidden md:flex w-96 bg-white border-l flex-col">
         {/* Cart Header */}
         <div className="p-4 border-b">
           <div className="flex items-center justify-between mb-2">
@@ -198,6 +203,96 @@ export function POSInterface() {
           </div>
         )}
       </div>
+      {showCart && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          {/* Overlay */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowCart(false)}
+          />
+
+          {/* Drawer */}
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-xl max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="font-bold">Cart</h2>
+              <button onClick={() => setShowCart(false)}>
+                <X />
+              </button>
+            </div>
+
+            {/* Cart content (reuse your existing JSX) */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {/* cart items */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {cart.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                    <ShoppingCart className="w-16 h-16 mb-2" />
+                    <p className="text-sm">Cart is empty</p>
+                    <p className="text-xs">Add products to start a sale</p>
+                  </div>
+                ) : (
+                  cart.map(item => (
+                    <CartItemCard
+                      key={item.id}
+                      item={item}
+                      onUpdateQuantity={updateQuantity}
+                      onRemove={removeFromCart}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="border-t p-4">
+              {/* totals + button */}
+              {cart.length > 0 && (
+                <div className="border-t p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span className="font-semibold">{formatCurrency(totals.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Tax</span>
+                    <span className="font-semibold">{formatCurrency(totals.tax)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Discount</span>
+                    <span className="font-semibold text-red-600">
+                      -{formatCurrency(totals.discount)}
+                    </span>
+                  </div>
+                  <div className="border-t pt-2 flex justify-between">
+                    <span className="font-bold text-lg">Total</span>
+                    <span className="font-bold text-xl text-blue-600">
+                      {formatCurrency(totals.total)}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => setShowPaymentModal(true)}
+                    disabled={createSale.isPending}
+                    className="w-full mt-4 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:bg-gray-400"
+                  >
+                    {createSale.isPending ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-5 h-5" />
+                        Proceed to Payment
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Payment Modal */}
       {showPaymentModal && (

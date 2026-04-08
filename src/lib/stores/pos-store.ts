@@ -125,9 +125,8 @@ export const usePOSStore = create<POSStore>()(
       setCustomerName: (customerName) => set({ customerName }),
 
       getCartTotal: () => {
-        const { cart, discount, tax } = get();
-        
-        const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+        const { cart, discount, tax } = get();        
+        const subtotal = cart.reduce((sum, item) => sum + Number(item.subtotal), 0);
         const taxAmount = subtotal * (tax / 100);
         const total = subtotal + taxAmount - discount;
 

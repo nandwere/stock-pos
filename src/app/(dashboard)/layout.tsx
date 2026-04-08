@@ -1,8 +1,6 @@
-// app/(dashboard)/layout.tsx
+// app/(dashboard)/layout.tsx (SERVER)
 import { requireAuth } from '@/lib/auth';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { Header } from '@/components/layout/Header';
-import { ToastProvider } from '@/components/ui/toast-provider';
+import DashboardClientLayout from './DashboardClientLayout';
 
 export default async function DashboardLayout({
   children,
@@ -12,22 +10,8 @@ export default async function DashboardLayout({
   const user = await requireAuth();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
-      {/* Sidebar */}
-      <Sidebar user={user} />
-
-      {/* Main content area */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Header */}
-        <Header user={user} />
-
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
-          <ToastProvider>
-            {children}
-          </ToastProvider>
-        </main>
-      </div>
-    </div>
+    <DashboardClientLayout user={user}>
+      {children}
+    </DashboardClientLayout>
   );
 }

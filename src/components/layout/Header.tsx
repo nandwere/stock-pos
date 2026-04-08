@@ -5,12 +5,15 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, LogOut, User, ChevronDown } from 'lucide-react';
 import type { User as UserType } from '@/types';
+import { Sidebar } from './Sidebar';
 
 interface HeaderProps {
   user: UserType;
+  onMenuClick?: () => void;
+  open?: boolean;
 }
 
-export function Header({ user }: HeaderProps) {
+export function Header({ user, onMenuClick, open }: HeaderProps) {
   const router = useRouter();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -26,7 +29,13 @@ export function Header({ user }: HeaderProps) {
 
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
-      <div className="flex items-center gap-4">
+      <button
+        className="md:hidden"
+        onClick={onMenuClick}
+      >
+        ☰
+      </button>
+      <div className="flex items-center gap-1">
         <h1 className="text-xl font-semibold text-gray-900">
           {getPageTitle()}
         </h1>
@@ -50,6 +59,13 @@ export function Header({ user }: HeaderProps) {
             </div>
             <ChevronDown className="w-4 h-4" />
           </button>
+          {open && (
+            <div className="fixed inset-0 z-50 bg-black/50">
+              <div className="w-64 bg-white h-full">
+                <Sidebar user={user} />
+              </div>
+            </div>
+          )}
 
           {/* Dropdown Menu */}
           {showUserMenu && (
@@ -68,7 +84,7 @@ export function Header({ user }: HeaderProps) {
                     </span>
                   </p>
                 </div>
-                
+
                 <button
                   onClick={() => {
                     setShowUserMenu(false);
