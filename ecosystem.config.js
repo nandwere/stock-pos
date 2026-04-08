@@ -1,11 +1,10 @@
-// ecosystem.config.js
 module.exports = {
   apps: [{
     name: 'stock-pos',
     script: 'npm',
     args: 'start',
-    cwd: '/home/app/apps/stock-pos-system',
-    instances: 2,
+    cwd: '/home/app/apps/stock-pos',
+    instances: 1,
     exec_mode: 'cluster',
     env: {
       NODE_ENV: 'production',
