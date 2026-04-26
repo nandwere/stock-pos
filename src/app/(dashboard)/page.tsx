@@ -16,6 +16,7 @@ import { formatCurrency } from '@/lib/stock-calculations';
 import { useDashboardStats } from '@/lib/hooks/use-dashboard';
 import { useRecentSales } from '@/lib/hooks/use-sales';
 import { useLowStockProducts } from '@/lib/hooks/use-products';
+import Link from 'next/link';
 
 interface DashboardStats {
   todaySales: number;
@@ -59,9 +60,8 @@ export default function DashboardPage() {
               <DollarSign className="w-6 h-6 text-blue-600" />
             </div>
             {stats?.salesChange !== undefined && stats.salesChange !== 0 && (
-              <div className={`flex items-center gap-1 text-sm font-medium ${
-                stats.salesChange > 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
+              <div className={`flex items-center gap-1 text-sm font-medium ${stats.salesChange > 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
                 <TrendingUp className={`w-4 h-4 ${stats.salesChange < 0 ? 'rotate-180' : ''}`} />
                 {stats.salesChange > 0 ? '+' : ''}{stats?.salesChange?.toFixed(1)}%
               </div>
@@ -164,11 +164,15 @@ function RecentSales({ sales, isLoading }: { sales: any[], isLoading: boolean })
           </a>
         </div>
       </div>
-      
+
       {sales.length > 0 ? (
         <div className="divide-y divide-gray-200">
           {sales.map(sale => (
-            <div key={sale.id} className="p-4 hover:bg-gray-50 cursor-pointer">
+            <Link
+              href={`/sales/${sale.id}`}
+              key={sale.id}
+              className="block p-4 hover:bg-gray-50"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
@@ -194,7 +198,7 @@ function RecentSales({ sales, isLoading }: { sales: any[], isLoading: boolean })
                   </p>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       ) : (
@@ -234,7 +238,7 @@ function LowStockAlert({ items, isLoading }: { items: any[], isLoading: boolean 
         <div className="divide-y divide-gray-200">
           {items.map(item => {
             const stockPercentage = (Number(item.currentStock) / Number(item.reorderLevel)) * 100;
-            
+
             return (
               <div key={item.id} className="p-4">
                 <div className="flex items-start justify-between">
@@ -252,13 +256,12 @@ function LowStockAlert({ items, isLoading }: { items: any[], isLoading: boolean 
                 <div className="mt-2">
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className={`h-2 rounded-full ${
-                        stockPercentage < 25 
-                          ? 'bg-red-500' 
-                          : stockPercentage < 50 
-                          ? 'bg-orange-500' 
+                      className={`h-2 rounded-full ${stockPercentage < 25
+                        ? 'bg-red-500'
+                        : stockPercentage < 50
+                          ? 'bg-orange-500'
                           : 'bg-yellow-500'
-                      }`}
+                        }`}
                       style={{ width: `${Math.min(stockPercentage, 100)}%` }}
                     />
                   </div>
@@ -286,7 +289,7 @@ function SalesChart() {
     <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">Sales Overview</h2>
-        <select 
+        <select
           className="px-3 py-1 border border-gray-300 rounded text-sm"
           value={timeRange}
           onChange={(e) => setTimeRange(e.target.value)}
@@ -321,23 +324,23 @@ function SalesChart() {
 // Simple Sales Chart (placeholder - replace with recharts)
 function SimpleSalesChart({ data }: { data: any[] }) {
   const maxValue = Math.max(...data.map(d => d.amount));
-  
+
   return (
     <div className="h-full flex items-end gap-2 px-4">
       {data.map((item, index) => {
         const height = (item.amount / maxValue) * 100;
-        
+
         return (
           <div key={index} className="flex-1 flex flex-col items-center">
-            <div 
+            <div
               className="w-full bg-blue-500 rounded-t hover:bg-blue-600 transition-colors cursor-pointer"
               style={{ height: `${height}%` }}
               title={`${item.date}: ${formatCurrency(item.amount)}`}
             />
             <div className="text-xs text-gray-500 mt-2">
-              {new Date(item.date).toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric' 
+              {new Date(item.date).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
               })}
             </div>
           </div>

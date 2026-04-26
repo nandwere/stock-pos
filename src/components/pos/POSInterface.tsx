@@ -56,6 +56,7 @@ export function POSInterface() {
 
       await createSale.mutateAsync(saleData);
       setShowPaymentModal(false);
+      clearCart();
 
       // Show success message
       alert('Sale completed successfully!');
@@ -401,23 +402,33 @@ function CartItemCard({ item, onUpdateQuantity, onRemove }: any) {
     </div>
   );
 }
-
-// Payment Modal Component (same as before)
+// Payment Modal Component
 function PaymentModal({ total, onClose, onComplete }: any) {
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'MOBILE_MONEY'>('CASH');
-  const [amountPaid, setAmountPaid] = useState(total.toString());
-  const [customerName, setCustomerName] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CREDIT' | 'MOBILE_MONEY'>('CASH');
+  const [amountPaid, setAmountPaid]       = useState(total.toString());
+  const [customerName, setCustomerName]   = useState('');
+  const [submitting, setSubmitting]       = useState(false);  // ← guard
 
-  const change = Math.max(0, parseFloat(amountPaid || '0') - total);
-  const canComplete = parseFloat(amountPaid || '0') >= total;
+  const change     = Math.max(0, parseFloat(amountPaid || '0') - total);
+  const canComplete = parseFloat(amountPaid || '0') >= total && !submitting;
 
-  const handleComplete = () => {
-    onComplete({
-      paymentMethod,
-      amountPaid: parseFloat(amountPaid),
-      change,
-      customerName: customerName || undefined
-    });
+  const handleComplete = async () => {
+    // Hard-block any second invocation while the first is in-flight
+    if (submitting) return;
+    setSubmitting(true);
+
+    try {
+      await onComplete({
+        paymentMethod,
+        amountPaid:   parseFloat(amountPaid),
+        change,
+        customerName: customerName || undefined,
+      });
+      // onComplete is responsible for closing the modal on success.
+      // If it throws, we re-enable the button so the cashier can retry.
+    } catch {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -425,7 +436,12 @@ function PaymentModal({ total, onClose, onComplete }: any) {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
         <div className="p-6 border-b flex items-center justify-between">
           <h2 className="text-xl font-bold">Payment</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+          {/* Prevent closing while a submission is in-flight */}
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            className="text-gray-500 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -444,17 +460,19 @@ function PaymentModal({ total, onClose, onComplete }: any) {
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { value: 'CASH', icon: Banknote, label: 'Cash' },
-                { value: 'CARD', icon: CreditCard, label: 'Card' },
+                { value: 'CASH',         icon: Banknote,   label: 'Cash'   },
+                { value: 'CREDIT',       icon: CreditCard, label: 'Credit' },
                 { value: 'MOBILE_MONEY', icon: Smartphone, label: 'M-Pesa' },
               ].map(({ value, icon: Icon, label }) => (
                 <button
                   key={value}
-                  onClick={() => setPaymentMethod(value as any)}
-                  className={`p-3 border rounded-lg flex flex-col items-center gap-2 transition-colors ${paymentMethod === value
-                    ? 'border-blue-600 bg-blue-50'
-                    : 'border-gray-300 hover:border-gray-400'
-                    }`}
+                  onClick={() => !submitting && setPaymentMethod(value as any)}
+                  disabled={submitting}
+                  className={`p-3 border rounded-lg flex flex-col items-center gap-2 transition-colors disabled:opacity-50 ${
+                    paymentMethod === value
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
                 >
                   <Icon className="w-6 h-6" />
                   <span className="text-sm font-medium">{label}</span>
@@ -471,7 +489,8 @@ function PaymentModal({ total, onClose, onComplete }: any) {
               type="number"
               value={amountPaid}
               onChange={(e) => setAmountPaid(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={submitting}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
               step="0.01"
               min={total}
             />
@@ -494,7 +513,8 @@ function PaymentModal({ total, onClose, onComplete }: any) {
               type="text"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={submitting}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
               placeholder="Enter customer name"
             />
           </div>
@@ -503,7 +523,8 @@ function PaymentModal({ total, onClose, onComplete }: any) {
         <div className="p-6 border-t flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
+            disabled={submitting}
+            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -512,8 +533,20 @@ function PaymentModal({ total, onClose, onComplete }: any) {
             disabled={!canComplete}
             className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            <Receipt className="w-5 h-5" />
-            Complete Sale
+            {submitting ? (
+              <>
+                <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                Processing…
+              </>
+            ) : (
+              <>
+                <Receipt className="w-5 h-5" />
+                Complete Sale
+              </>
+            )}
           </button>
         </div>
       </div>

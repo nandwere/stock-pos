@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUserStore } from '@/lib/stores/user-store';
+import { User } from '@/types';
 
 // API functions
 async function fetchUsers() {
@@ -129,4 +130,39 @@ export function useDeleteUser() {
       deleteUserFromStore(deletedId);
     },
   });
+}
+
+
+export function useToggleUserStatus() {
+    const qc = useQueryClient();
+ 
+    return useMutation({
+        mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+            fetch(`/api/users/${id}`, {
+                method:  'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ isActive }),
+            }).then(r => {
+                if (!r.ok) throw new Error('Failed to update user status');
+                return r.json();
+            }),
+ 
+        // Optimistic update — flip the toggle in the cache immediately
+        onMutate: async ({ id, isActive }) => {
+            await qc.cancelQueries({ queryKey: ['users'] });
+            const previous = qc.getQueryData<User[]>(['users']);
+            qc.setQueryData<User[]>(['users'], old =>
+                old?.map(u => u.id === id ? { ...u, isActive } : u) ?? []
+            );
+            return { previous };
+        },
+ 
+        // Roll back on error
+        onError: (_err, _vars, ctx) => {
+            if (ctx?.previous) qc.setQueryData(['users'], ctx.previous);
+        },
+ 
+        // Always refetch to stay in sync
+        onSettled: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    });
 }

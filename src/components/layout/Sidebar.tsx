@@ -24,45 +24,48 @@ interface NavItem {
 }
 
 const navigationItems: NavItem[] = [
-  { 
-    href: '/', 
-    label: 'Dashboard', 
-    icon: LayoutDashboard 
+  {
+    href: '/',
+    label: 'Dashboard',
+    icon: LayoutDashboard
   },
-  { 
-    href: '/pos', 
-    label: 'Point of Sale', 
-    icon: ShoppingCart 
+  {
+    href: '/pos',
+    label: 'Point of Sale',
+    icon: ShoppingCart
   },
-  { 
-    href: '/inventory', 
-    label: 'Inventory', 
-    icon: Package 
+  {
+    href: '/sales',
+    label: 'Sales History',
+    icon: ShoppingBag
   },
-  { 
-    href: '/sales', 
-    label: 'Sales History', 
-    icon: ShoppingBag 
+  {
+    href: '/stock-count',
+    label: 'Stock Count',
+    icon: ClipboardList,
+    roles: ['OWNER', 'MANAGER']
   },
-  { 
-    href: '/stock-count', 
-    label: 'Stock Count', 
-    icon: ClipboardList 
+  {
+    href: '/inventory/stock-adjustments',
+    label: 'Stock Adjustments',
+    icon: ClipboardList,
+    roles: ['OWNER', 'MANAGER']
   },
-  { 
-    href: '/inventory/stock-adjustments', 
-    label: 'Stock Adjustments', 
-    icon: ClipboardList 
+  {
+    href: '/inventory',
+    label: 'Inventory',
+    icon: Package,
+    roles: ['OWNER', 'MANAGER']
   },
-  { 
-    href: '/reports', 
-    label: 'Reports', 
+  {
+    href: '/reports',
+    label: 'Reports',
     icon: BarChart3,
     roles: ['OWNER', 'MANAGER']
   },
-  { 
-    href: '/settings', 
-    label: 'Settings', 
+  {
+    href: '/settings',
+    label: 'Settings',
     icon: Settings,
     roles: ['OWNER', 'MANAGER']
   },
@@ -76,7 +79,7 @@ export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
 
   // Filter nav items based on user role
-  const visibleItems = navigationItems.filter(item => 
+  const visibleItems = navigationItems.filter(item =>
     !item.roles || item.roles.includes(user.role)
   );
 
@@ -99,7 +102,7 @@ export function Sidebar({ user }: SidebarProps) {
       <nav className="flex-1 overflow-y-auto py-4">
         <ul className="space-y-1 px-3">
           {visibleItems.map((item) => {
-            const isActive = pathname === item.href || 
+            const isActive = pathname === item.href ||
               (item.href !== '/' && pathname.startsWith(item.href));
             const Icon = item.icon;
 

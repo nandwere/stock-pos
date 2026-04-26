@@ -14,10 +14,15 @@ import {
     Save,
     Upload,
     RefreshCw,
+    UserCheck,
+    UserX,
+    Pencil,
+    Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useUsers } from '@/lib/hooks/use-users';
+import { useToggleUserStatus, useUsers } from '@/lib/hooks/use-users';
 import { User } from '@/types';
+import { usePOSStore } from '@/lib/stores/pos-store';
 
 interface Settings {
     // Business Info
@@ -515,40 +520,116 @@ function NotificationSettings({ settings, setSettings }: any) {
 
 // User Management Section
 
-function UserManagementSettings() {
+// ── Confirm dialog ────────────────────────────────────────────────────────────
+function ConfirmDialog({
+    user,
+    onConfirm,
+    onCancel,
+    loading,
+}: {
+    user: User;
+    onConfirm: () => void;
+    onCancel: () => void;
+    loading: boolean;
+}) {
+    const isActive = user.isActive;
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto ${isActive ? 'bg-red-100' : 'bg-green-100'}`}>
+                    {isActive
+                        ? <UserX className="w-6 h-6 text-red-600" />
+                        : <UserCheck className="w-6 h-6 text-green-600" />
+                    }
+                </div>
+                <div className="text-center">
+                    <h3 className="font-semibold text-gray-900 text-lg">
+                        {isActive ? 'Deactivate' : 'Activate'} User
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Are you sure you want to {isActive ? 'deactivate' : 'activate'}{' '}
+                        <span className="font-medium text-gray-800">{user.name}</span>?
+                        {isActive && ' They will lose access immediately.'}
+                    </p>
+                </div>
+                <div className="flex gap-3 pt-1">
+                    <button
+                        onClick={onCancel}
+                        disabled={loading}
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        disabled={loading}
+                        className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2 disabled:opacity-60 ${
+                            isActive
+                                ? 'bg-red-600 hover:bg-red-700'
+                                : 'bg-green-600 hover:bg-green-700'
+                        }`}
+                    >
+                        {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+ 
+// ── Main component ────────────────────────────────────────────────────────────
+export function UserManagementSettings() {
     const { data: users = [] } = useUsers() as { data: User[] };
 
+    const { mutateAsync: toggleStatus } = useToggleUserStatus();
+ 
+    const [pendingUser, setPendingUser] = useState<User | null>(null);
+    const [toggling,   setToggling]    = useState(false);
+ 
+    const handleToggle = async () => {
+        if (!pendingUser) return;
+        setToggling(true);
+        try {
+            await toggleStatus({ id: pendingUser.id, isActive: !pendingUser.isActive });
+            setPendingUser(null);
+        } finally {
+            setToggling(false);
+        }
+    };
+ 
     return (
         <div className="space-y-6">
+            {/* ── Header ── */}
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-lg font-semibold text-gray-900">User Management</h2>
                     <p className="text-sm text-gray-600 mt-1">Manage workers and their access</p>
                 </div>
-                
                 <Link
                     href="/settings/add"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2 text-sm"
                 >
-                    <Users className="w-5 h-5" />
+                    <Users className="w-4 h-4" />
                     Add User
                 </Link>
             </div>
-
+ 
+            {/* ── Table ── */}
             <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <table className="w-full">
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Email</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Role</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                        {users.map(user => (
-                            <tr key={user.id}>
+                        {users.map((user: User) => (
+                            <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 text-sm font-medium text-gray-900">{user.name}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
                                 <td className="px-6 py-4">
@@ -557,19 +638,60 @@ function UserManagementSettings() {
                                     </span>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                        user.isActive
+                                            ? 'bg-green-100 text-green-800'
+                                            : 'bg-gray-100 text-gray-500'
+                                    }`}>
                                         {user.isActive ? 'Active' : 'Inactive'}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-right text-sm">
-                                    <button className="text-blue-600 hover:text-blue-900 mr-3">Edit</button>
-                                    <button className="text-red-600 hover:text-red-900">Deactivate</button>
+                                    <div className="flex items-center justify-end gap-3">
+                                        <Link
+                                            href={`/settings/users/${user.id}/edit`}
+                                            className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                                        >
+                                            <Pencil className="w-3.5 h-3.5" /> Edit
+                                        </Link>
+                                        <button
+                                            onClick={() => setPendingUser(user)}
+                                            className={`flex items-center gap-1 ${
+                                                user.isActive
+                                                    ? 'text-red-600 hover:text-red-900'
+                                                    : 'text-green-600 hover:text-green-900'
+                                            }`}
+                                        >
+                                            {user.isActive
+                                                ? <><UserX className="w-3.5 h-3.5" /> Deactivate</>
+                                                : <><UserCheck className="w-3.5 h-3.5" /> Activate</>
+                                            }
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
+ 
+                        {users.length === 0 && (
+                            <tr>
+                                <td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-400">
+                                    No users found.
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>
+ 
+            {/* ── Confirm dialog ── */}
+            {pendingUser && (
+                <ConfirmDialog
+                    user={pendingUser}
+                    onConfirm={handleToggle}
+                    onCancel={() => !toggling && setPendingUser(null)}
+                    loading={toggling}
+                />
+            )}
         </div>
     );
 }
