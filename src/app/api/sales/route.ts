@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const total = subtotal;
 
     // Create sale in transaction
-    const sale = await prisma.$transaction(async (tx) => {
+    const sale = await prisma.$transaction(async (tx: { sale: { create: (arg0: { data: { saleNumber: string; userId: string; customerName: any; paymentMethod: any; subtotal: any; total: any; amountPaid: any; items: { create: any; }; }; include: { items: boolean; }; }) => any; }; product: { update: (arg0: { where: { id: any; }; data: { currentStock: { decrement: any; }; }; select: { id: boolean; name: boolean; currentStock: boolean; }; }) => any; }; }) => {
       // Create sale
       const newSale = await tx.sale.create({
         data: {
@@ -136,14 +136,14 @@ export async function GET(request: NextRequest) {
     const startDate = url.searchParams.get('startDate');
     const endDate = url.searchParams.get('endDate');
 
-    // console.log('Fetching sales with filters:', {
-    //   q,
-    //   paymentMethod,
-    //   startDate,
-    //   endDate,
-    //   take,
-    //   skip
-    // });
+    console.log('Fetching sales with filters:', {
+      q,
+      paymentMethod,
+      startDate,
+      endDate,
+      take,
+      skip
+    });
 
     const where: any = {};
     if (q) {

@@ -8,16 +8,23 @@ import { Sale } from '@/types';
 import { useState, useMemo } from 'react';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-const toDateInput = (d: Date) => d.toISOString().slice(0, 10);
+const toDateInput = (d: Date) => { 
+    console.log('Converting date to input format:', d);
+    const iso = d.toLocaleDateString().slice(0, 10).split('/').reverse().join('-');
+    console.log('ISO string:', iso);
+    return iso; 
+};
 
 const todayStart = () => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
+    console.log('Today start is:', d);
     return d;
 };
 const todayEnd = () => {
     const d = new Date();
     d.setHours(23, 59, 59, 999);
+    console.log('Today end is:', d);
     return d;
 };
 
@@ -32,7 +39,7 @@ const QUICK_RANGES = [
 ];
 
 export function SalesList() {
-    const { data: sales = [], isLoading, error } = useSales();
+    const { data: sales = [], isLoading, error } = useSales({startDate: toDateInput(todayStart()), endDate: toDateInput(todayEnd())});
 
     // ── filter state (default: today) ────────────────────────────────────────
     const [query,         setQuery]         = useState('');
