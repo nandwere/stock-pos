@@ -8,51 +8,52 @@ import { Sale } from '@/types';
 import { useState, useMemo } from 'react';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-const toDateInput = (d: Date) => { 
-    console.log('Converting date to input format:', d);
-    const iso = d.toLocaleDateString().slice(0, 10).split('/').reverse().join('-');
-    console.log('ISO string:', iso);
-    return iso; 
-};
+const toDateInput = (d: Date) =>
+    d.toLocaleDateString().slice(0, 10).split('/').reverse().join('-');
+
 
 const todayStart = () => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
-    console.log('Today start is:', d);
     return d;
 };
 const todayEnd = () => {
     const d = new Date();
     d.setHours(23, 59, 59, 999);
-    console.log('Today end is:', d);
     return d;
 };
 
 const PAYMENT_METHODS = ['All', 'CASH', 'CREDIT', 'MOBILE_MONEY', 'CREDIT_CARD'];
 
 const QUICK_RANGES = [
-    { label: 'Today',      getRange: () => ({ from: todayStart(), to: todayEnd() }) },
-    { label: 'Yesterday',  getRange: () => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(0,0,0,0); const e = new Date(d); e.setHours(23,59,59,999); return { from: d, to: e }; } },
-    { label: 'This Week',  getRange: () => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); d.setHours(0,0,0,0); return { from: d, to: todayEnd() }; } },
-    { label: 'This Month', getRange: () => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return { from: d, to: todayEnd() }; } },
-    { label: 'All Time',   getRange: () => ({ from: null, to: null }) },
+    { label: 'Today', getRange: () => ({ from: todayStart(), to: todayEnd() }) },
+    { label: 'Yesterday', getRange: () => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(0, 0, 0, 0); const e = new Date(d); e.setHours(23, 59, 59, 999); return { from: d, to: e }; } },
+    {
+        label: 'This Week', getRange: () => {
+            const from = new Date();
+            from.setDate(from.getDate() - 6);
+            from.setHours(0, 0, 0, 0);
+            return { from, to: todayEnd() };
+        },
+    },
+    { label: 'This Month', getRange: () => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return { from: d, to: todayEnd() }; } },
+    { label: 'All Time', getRange: () => ({ from: null, to: null }) },
 ];
 
 export function SalesList() {
-    const { data: sales = [], isLoading, error } = useSales({startDate: toDateInput(todayStart()), endDate: toDateInput(todayEnd())});
-
     // ── filter state (default: today) ────────────────────────────────────────
-    const [query,         setQuery]         = useState('');
-    const [dateFrom,      setDateFrom]      = useState<string>(toDateInput(todayStart()));
-    const [dateTo,        setDateTo]        = useState<string>(toDateInput(todayEnd()));
+    const [query, setQuery] = useState('');
+    const [dateFrom, setDateFrom] = useState<string>(toDateInput(todayStart()));
+    const [dateTo, setDateTo] = useState<string>(toDateInput(todayEnd()));
     const [paymentMethod, setPaymentMethod] = useState('All');
-    const [activeRange,   setActiveRange]   = useState('Today');
+    const [activeRange, setActiveRange] = useState('Today');
+    const { data: sales = [], isLoading, error } = useSales({ startDate: dateFrom || '', endDate: dateTo || '' });
 
     const applyQuickRange = (label: string, getRange: () => { from: Date | null; to: Date | null }) => {
         setActiveRange(label);
         const { from, to } = getRange();
         setDateFrom(from ? toDateInput(from) : '');
-        setDateTo(to   ? toDateInput(to)   : '');
+        setDateTo(to ? toDateInput(to) : '');
     };
 
     const clearFilters = () => {
@@ -97,7 +98,7 @@ export function SalesList() {
 
     // ── summary stats ─────────────────────────────────────────────────────────
     const totalRevenue = filtered.reduce((sum: number, s: Sale) => sum + Number(s.total), 0);
-    const totalItems   = filtered.reduce((sum: number, s: Sale) => sum + (s.items?.length ?? 0), 0);
+    const totalItems = filtered.reduce((sum: number, s: Sale) => sum + (s.items?.length ?? 0), 0);
 
     const hasActiveFilters =
         activeRange !== 'Today' ||
@@ -140,11 +141,10 @@ export function SalesList() {
                         <button
                             key={label}
                             onClick={() => applyQuickRange(label, getRange)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                                activeRange === label
-                                    ? 'bg-blue-600 text-white border-blue-600'
-                                    : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                            }`}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${activeRange === label
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                                }`}
                         >
                             {label}
                         </button>
@@ -217,9 +217,9 @@ export function SalesList() {
             {/* ── Summary stats ── */}
             <div className="grid grid-cols-3 gap-4">
                 {[
-                    { label: 'Sales',    value: filtered.length.toString(),   color: 'text-blue-600' },
-                    { label: 'Revenue',  value: formatCurrency(totalRevenue), color: 'text-green-600' },
-                    { label: 'Items Sold', value: totalItems.toString(),       color: 'text-purple-600' },
+                    { label: 'Sales', value: filtered.length.toString(), color: 'text-blue-600' },
+                    { label: 'Revenue', value: formatCurrency(totalRevenue), color: 'text-green-600' },
+                    { label: 'Items Sold', value: totalItems.toString(), color: 'text-purple-600' },
                 ].map(s => (
                     <div key={s.label} className="bg-white rounded-lg border border-gray-200 shadow p-4">
                         <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
@@ -276,13 +276,12 @@ export function SalesList() {
                                             {formatCurrency(Number(sale.total))}
                                         </td>
                                         <td className="p-3">
-                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                sale.paymentMethod === 'Cash'
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : sale.paymentMethod === 'Card'
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sale.paymentMethod === 'Cash'
+                                                ? 'bg-green-100 text-green-700'
+                                                : sale.paymentMethod === 'Card'
                                                     ? 'bg-blue-100 text-blue-700'
                                                     : 'bg-purple-100 text-purple-700'
-                                            }`}>
+                                                }`}>
                                                 {sale.paymentMethod}
                                             </span>
                                         </td>
