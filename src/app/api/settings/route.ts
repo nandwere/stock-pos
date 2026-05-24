@@ -17,6 +17,7 @@ const SETTING_KEYS = [
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  console.log('GET /api/settings for merchantId:', session.merchantId);
 
   const [merchant, settings] = await Promise.all([
     prisma.merchant.findUnique({
@@ -69,13 +70,13 @@ export async function PUT(request: NextRequest) {
       // 1. Update merchant row
       prisma.merchant.update({
         where: { id: session.merchantId },
-        data:  merchantUpdate,
+        data: merchantUpdate,
       }),
 
       // 2. Upsert each setting key
       ...settingsUpserts.map(({ key, value }) =>
         prisma.settings.upsert({
-          where:  { merchantId_key: { merchantId: session.merchantId, key } },
+          where: { merchantId_key: { merchantId: session.merchantId, key } },
           update: { value },
           create: { merchantId: session.merchantId, key, value },
         })

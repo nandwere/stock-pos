@@ -122,7 +122,6 @@ export default function SettingsPage() {
                         {activeTab === 'business' && <BusinessInfoTab form={form} set={set} />}
                         {activeTab === 'currency' && <CurrencyTaxTab form={form} set={set} />}
                         {activeTab === 'pos' && <POSTab form={form} set={set} />}
-                        {activeTab === 'payment' && <PaymentRequestsPanel />}
                         {activeTab === 'notifications' && <NotificationsTab form={form} set={set} />}
                         {activeTab === 'users' && <UserManagementTab />}
                         {activeTab === 'security' && <SecurityTab form={form} set={set} />}
@@ -268,129 +267,6 @@ function POSTab({ form, set }: TabProps) {
                     className={`${inputCls} resize-none`} />
             </Field>
         </Section>
-    );
-}
-
-function PaymentRequestsPanel() {
-    const { data: requests = [], isLoading } = usePaymentRequests();
-    const { mutate: handle, isPending } = useHandlePaymentRequest();
-    const [rejectId, setRejectId] = useState<string | null>(null);
-    const [rejectNote, setRejectNote] = useState('');
-
-    const pending = requests?.filter(r => r.status === 'PENDING');
-    const resolved = requests?.filter(r => r.status !== 'PENDING');
-
-    return (
-        <section className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-gray-500" />
-                Payment Requests
-                {pending.length > 0 && (
-                    <span className="ml-auto px-2 py-0.5 text-xs font-bold bg-orange-100 text-orange-700 rounded-full">
-                        {pending.length} pending
-                    </span>
-                )}
-            </h2>
-
-            {isLoading ? (
-                <div className="flex justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                </div>
-            ) : requests.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-6">No payment requests yet</p>
-            ) : (
-                <div className="space-y-3">
-                    {[...pending, ...resolved].map(req => (
-                        <div key={req.id as React.Key}
-                            className={`rounded-lg border p-4 space-y-3
-                ${req.status === 'PENDING' ? 'border-orange-200 bg-orange-50'
-                                    : req.status === 'CONFIRMED' ? 'border-green-200 bg-green-50'
-                                        : 'border-gray-200 bg-gray-50'}`}
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full
-                      ${PLAN_LABELS[req.plan as Plan]?.color}`}>
-                                            {req.plan}
-                                        </span>
-                                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full
-                      ${req.status === 'PENDING' ? 'bg-orange-100 text-orange-700'
-                                                : req.status === 'CONFIRMED' ? 'bg-green-100 text-green-700'
-                                                    : 'bg-red-100 text-red-600'}`}>
-                                            {req.status}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-gray-500">
-                                        {new Date(req.createdAt).toLocaleString('en-KE')}
-                                    </p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-xs text-gray-500 mb-0.5">M-Pesa code</p>
-                                    <p className="font-mono font-bold text-gray-900 text-sm">{req.transactionCode}</p>
-                                </div>
-                            </div>
-
-                            {req.notes && (
-                                <p className="text-xs text-gray-600 bg-white rounded px-3 py-2 border border-gray-200">
-                                    Note: {req.notes}
-                                </p>
-                            )}
-
-                            {/* Reject reason input */}
-                            {rejectId === req.id && (
-                                <div className="space-y-2">
-                                    <input
-                                        value={rejectNote}
-                                        onChange={e => setRejectNote(e.target.value)}
-                                        placeholder="Reason for rejection (optional)"
-                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
-                                    />
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => {
-                                                handle({ id: String(req.id), action: 'reject', notes: rejectNote });
-                                                setRejectId(null);
-                                                setRejectNote('');
-                                            }}
-                                            className="flex-1 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700"
-                                        >
-                                            Confirm rejection
-                                        </button>
-                                        <button
-                                            onClick={() => setRejectId(null)}
-                                            className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs hover:bg-gray-50"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {req.status === 'PENDING' && rejectId !== req.id && (
-                                <div className="flex gap-2 pt-1">
-                                    <button
-                                        onClick={() => handle({ id: String(req.id), action: 'confirm' })}
-                                        disabled={isPending}
-                                        className="flex-1 py-2 bg-green-600 text-white rounded-lg text-xs font-semibold
-                               hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-1"
-                                    >
-                                        {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCheck className="w-3 h-3" />}
-                                        Confirm & Activate
-                                    </button>
-                                    <button
-                                        onClick={() => setRejectId(String(req.id))}
-                                        className="px-4 py-2 border border-red-300 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-50"
-                                    >
-                                        Reject
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
-        </section>
     );
 }
 

@@ -65,6 +65,12 @@ const navigationItems: NavItem[] = [
     roles: ['OWNER', 'MANAGER']
   },
   {
+    href: '/payment-requests',
+    label: 'Payment Requests',
+    icon: ClipboardList,
+    roles: ['OWNER']
+  },
+  {
     href: '/merchants',
     label: 'Merchants',
     icon: Users,
