@@ -47,6 +47,12 @@ export async function middleware(request: NextRequest) {
   const slug = resolveMerchantSlug(request);
 
   console.log(`Middleware: ${request.method} ${pathname} (slug: ${slug})`);
+  // API routes — only stamp the slug, skip all auth/redirect logic
+  if (pathname.startsWith('/api')) {
+    const response = NextResponse.next();
+    response.headers.set('x-merchant-slug', slug);
+    return response;
+  }
 
   // Helper: attach the slug header to any outgoing response
   function withSlug(response: NextResponse) {
@@ -117,6 +123,12 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
+    /*
+     * Run on everything EXCEPT:
+     * - _next/static, _next/image (Next.js internals)
+     * - favicon.ico, public folder (static files)
+     * API routes ARE included so x-merchant-slug gets stamped on them
+     */
+    '/((?!_next/static|_next/image|favicon.ico|public).*)',
   ],
 };
