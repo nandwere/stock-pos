@@ -35,13 +35,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const { merchantId } = session;
+  // const { merchantId } = session;
 
   if (!(await hasPermission('users.edit'))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   try {
     const { id } = await params;
+
+    const userRecord = await prisma.user.findFirst({
+      where: { id },
+    });
+    if (!userRecord) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    console.log('User record to update:', userRecord);
+
     const body = await request.json();
     const data: any = {};
 
@@ -51,7 +60,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body.password) data.password = await bcrypt.hash(body.password, 10);
 
     const updated = await prisma.user.update({
-      where: { id, merchantId },
+      where: { id, merchantId: userRecord.merchantId },
       data,
       select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
     });

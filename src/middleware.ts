@@ -9,6 +9,7 @@ export const runtime = 'nodejs';
 // ── Merchant resolution ────────────────────────────────────────────
 const HOSTNAME_TO_SLUG: Record<string, string> = {
   'stockpos.work.gd': 'baraka',
+  'demo.stockpos.work.gd': 'demo',
   'localhost': 'baraka',
 };
 const DEFAULT_SLUG = 'baraka';
