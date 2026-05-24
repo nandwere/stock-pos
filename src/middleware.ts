@@ -40,6 +40,9 @@ const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password'];
 
 // ── Middleware ─────────────────────────────────────────────────────
 export async function middleware(request: NextRequest) {
+  console.log('Middleware running for path:', request.nextUrl.pathname);
+  console.log('All headers:', Object.fromEntries(request.headers));
+
   const { pathname } = request.nextUrl;
   const slug = resolveMerchantSlug(request);
 
