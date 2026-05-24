@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    console.log("Request Headers:", Object.fromEntries(request.headers.entries()));
 
     // Resolved by middleware — never comes from the request body
     const merchantSlug = request.headers.get('x-merchant-slug');
