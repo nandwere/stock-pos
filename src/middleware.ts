@@ -9,10 +9,11 @@ export const runtime = 'nodejs';
 // ── Merchant resolution ────────────────────────────────────────────
 const HOSTNAME_TO_SLUG: Record<string, string> = {
   'stockpos.work.gd': 'baraka',
-  'demo.stockpos.work.gd': 'demo',
-  'localhost': 'test',
+  'www.stockpos.work.gd': 'baraka',
+  'demo.stockpos.work.gd': 'demo',   // 👈 add your demo merchant slug
+  'localhost': 'baraka',
 };
-const DEFAULT_SLUG = 'test';
+const DEFAULT_SLUG = 'baraka';
 
 // Map routes → required feature (null = no feature gate, just auth)
 const FEATURE_GATES: Record<string, Feature> = {
@@ -28,7 +29,7 @@ const FEATURE_GATES: Record<string, Feature> = {
 };
 
 function resolveMerchantSlug(request: NextRequest): string {
-  const hostname = request.nextUrl.hostname;
+  const hostname = request.headers.get('x-forwarded-host') ?? request.nextUrl.hostname;
   console.log('Resolving merchant slug for hostname:', hostname);
   return HOSTNAME_TO_SLUG[hostname] ?? DEFAULT_SLUG;
 }
