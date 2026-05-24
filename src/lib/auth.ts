@@ -167,8 +167,9 @@ export async function loginUser(
     //    or is suspended before we do any password work.
     const merchant = await prisma.merchant.findUnique({
       where: { slug: merchantIdentifier },
-      select: { id: true, isActive: true, name: true, plan: true },
+      select: { id: true, isActive: true, name: true, plan: true, slug: true },
     });
+    console.log('Resolved merchant for login:', merchant);
 
     if (!merchant) {
       return { success: false, error: 'Workspace not found' };

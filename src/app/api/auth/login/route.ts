@@ -7,6 +7,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password } = body;
 
+    console.log('Login attempt with email:', email);
+
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
@@ -15,7 +17,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Resolved by middleware — never comes from the request body
-    const merchantSlug = request.headers.get('x-merchant-slug') ?? 'baraka';
+    const merchantSlug = request.headers.get('x-merchant-slug') ?? 'test';
+    console.log('Login attempt for merchant slug:', merchantSlug);  
 
     const result = await loginUser(email, password, merchantSlug);
 

@@ -10,9 +10,9 @@ export const runtime = 'nodejs';
 const HOSTNAME_TO_SLUG: Record<string, string> = {
   'stockpos.work.gd': 'baraka',
   'demo.stockpos.work.gd': 'demo',
-  'localhost': 'baraka',
+  'localhost': 'test',
 };
-const DEFAULT_SLUG = 'baraka';
+const DEFAULT_SLUG = 'test';
 
 // Map routes → required feature (null = no feature gate, just auth)
 const FEATURE_GATES: Record<string, Feature> = {
@@ -40,6 +40,8 @@ const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password'];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const slug = resolveMerchantSlug(request);
+
+  console.log(`Middleware: ${request.method} ${pathname} (slug: ${slug})`);
 
   // Helper: attach the slug header to any outgoing response
   function withSlug(response: NextResponse) {
