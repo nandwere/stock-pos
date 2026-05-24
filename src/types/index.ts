@@ -1,23 +1,61 @@
 
 export type UserRole = 'OWNER' | 'MANAGER' | 'CASHIER';
+export type MerchantPlan = 'FREE' | 'STARTER' | 'GROWTH' | 'ENTERPRISE';
+
+export interface Merchant {
+  id: string;
+  slug: string;
+  email: string;
+  name: string;
+  phone: string;
+  address: string;
+  logoUrl: string;
+  currency: string;
+  timezone: string;
+  plan: MerchantPlan;
+  isActive: boolean;
+  trialEndsAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type PaymentStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED';
+
+export interface PaymentRequest {
+  id: String;
+  merchantId: String;
+  plan: MerchantPlan;
+  transactionCode: String;
+  status: PaymentStatus;
+  notes?: String;
+  createdAt: Date;
+  updatedAt: Date;
+  merchant: Merchant;
+}
+
 
 export interface User {
   id: string;
+  merchantId: string;
   email: string;
   name: string;
   role: UserRole;
   isActive: boolean;
+  plan?: MerchantPlan;
 }
 
 export interface SessionPayload {
+  merchantId: string;
   userId: string;
   email: string;
   role: UserRole;
   expiresAt: Date;
+  plan: MerchantPlan;
 }
 
 export interface Category {
   id: string;
+  merchantId: string;
   name: string;
   description: string;
 }
@@ -25,6 +63,7 @@ export interface Category {
 
 export interface Product {
   id: string;
+  merchantId: string;
   name: string;
   sku: string;
   barcode?: string;
@@ -51,6 +90,7 @@ export interface SaleItem {
 
 export interface Sale {
   id: string;
+  merchantId: string;
   saleNumber: string;
   customerName?: string;
   paymentMethod?: string;
@@ -92,6 +132,7 @@ export enum TransactionType {
 
 export interface StockAdjustment {
   id: string;
+  merchantId: string;
   productId: string;
   userId: string;
   type: TransactionType;
@@ -99,7 +140,7 @@ export interface StockAdjustment {
   reason: string;
   notes?: string;
   createdAt: Date;
-  
+
   // Relationss
   product: Product;
   user: User;
@@ -128,20 +169,9 @@ export interface StockCountReport {
   totalVariance: number;
 }
 
-export interface StockCountEntry {
-  productId: string;
-  product: Product;
-  openingStock: number;
-  recordedSales: number;
-  expectedStock: number;
-  actualStock: number | null;
-  variance: number | null;
-  estimatedRevenue: number | null;
-  notes: string;
-}
-
 export interface StockCount {
   id: string;
+  merchantId: string;
   date: string;
   entries: StockCountEntry[];
   totalProducts: number;
@@ -172,6 +202,7 @@ export interface StockCountReport {
 
 export interface ProductVarianceReport {
   productId: string;
+  merchantId: string;
   productName: string;
   productSku: string;
   categoryId: string;
@@ -185,6 +216,7 @@ export interface ProductVarianceReport {
 
 export interface DailyStockSummary {
   date: string;
+  merchantId: string;
   totalProducts: number;
   perfectMatches: number;
   missingStock: number;

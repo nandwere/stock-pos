@@ -1,10 +1,15 @@
 // /Users/flag/Desktop/stock-pos-system/src/app/api/sales/chart/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, getSession } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { merchantId } = session;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json(
@@ -19,7 +24,7 @@ export async function GET(request: NextRequest) {
     // Get date range
     const endDate = new Date();
     endDate.setHours(23, 59, 59, 999);
-    
+
     const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - (days - 1));
     startDate.setHours(0, 0, 0, 0);
@@ -31,6 +36,7 @@ export async function GET(request: NextRequest) {
           gte: startDate,
           lte: endDate,
         },
+        merchantId,
       },
       select: {
         createdAt: true,

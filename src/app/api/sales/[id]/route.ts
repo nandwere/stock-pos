@@ -11,17 +11,15 @@ export async function GET(
   try {
     const session = await getSession();
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const { merchantId } = session;
 
     // Await the params Promise
     const { id } = await params;
-    
+
     const sale = await prisma.sale.findUnique({
-      where: { id },
+      where: { id, merchantId },
       include: {
         user: {
           select: {
@@ -79,13 +77,14 @@ export async function PUT(
         { status: 401 }
       );
     }
+    const { merchantId } = session;
 
     const { id } = await params;
     const body = await request.json();
-    
+
     // Update sale logic
     const updatedSale = await prisma.sale.update({
-      where: { id },
+      where: { id, merchantId },
       data: {
         // your update data
       },
@@ -115,11 +114,11 @@ export async function DELETE(
         { status: 401 }
       );
     }
-
+    const { merchantId } = session;
     const { id } = await params;
-    
+
     await prisma.sale.delete({
-      where: { id }
+      where: { id, merchantId }
     });
 
     return NextResponse.json(

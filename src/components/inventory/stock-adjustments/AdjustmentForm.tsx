@@ -89,6 +89,7 @@ export function AdjustmentForm({ onSubmit, isSubmitting, products }: AdjustmentF
     await onSubmit({
       productId: formData.productId,
       type: formData.type,
+      
       quantity: parseFloat(formData.quantity),
       reason: formData.reason,
       notes: formData.notes || undefined,

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@/types';
+import { useSettings } from '@/lib/hooks/use-settings';
 
 interface NavItem {
   href: string;
@@ -39,6 +40,12 @@ const navigationItems: NavItem[] = [
     label: 'Sales History',
     icon: ShoppingBag
   },
+    {
+    href: '/inventory',
+    label: 'Inventory',
+    icon: Package,
+    roles: ['OWNER', 'MANAGER']
+  },
   {
     href: '/stock-count',
     label: 'Stock Count',
@@ -52,16 +59,22 @@ const navigationItems: NavItem[] = [
     roles: ['OWNER', 'MANAGER']
   },
   {
-    href: '/inventory',
-    label: 'Inventory',
-    icon: Package,
-    roles: ['OWNER', 'MANAGER']
-  },
-  {
     href: '/reports',
     label: 'Reports',
     icon: BarChart3,
     roles: ['OWNER', 'MANAGER']
+  },
+  {
+    href: '/merchants',
+    label: 'Merchants',
+    icon: Users,
+    roles: ['OWNER']
+  },
+  {
+    href: '/users',
+    label: 'Users',
+    icon: Users,
+    roles: ['OWNER']
   },
   {
     href: '/settings',
@@ -76,6 +89,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ user }: SidebarProps) {
+  const { data, isLoading, error } = useSettings();
+
   const pathname = usePathname();
 
   // Filter nav items based on user role
@@ -92,7 +107,7 @@ export function Sidebar({ user }: SidebarProps) {
             <ShoppingBag className="w-5 h-5 text-white" />
           </div>
           <div>
-            <div className="text-lg font-bold text-gray-900">Stock POS</div>
+            <div className="text-lg font-bold text-gray-900">{data?.name || 'Stock POS'}</div>
             <div className="text-xs text-gray-500">{user.role}</div>
           </div>
         </Link>

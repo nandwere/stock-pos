@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { jwtVerify, SignJWT } from 'jose';
 import bcrypt from 'bcryptjs';
 import { prisma } from './prisma';
-import { SessionPayload, User, UserRole } from '@/types';
+import { MerchantPlan, SessionPayload, User, UserRole } from '@/types';
 
 const secret = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-secret-key-change-in-production'
@@ -49,9 +49,11 @@ export async function createSession(user: User) {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   const payload: SessionPayload = {
     userId: user.id,
+    merchantId: user.merchantId,
     email: user.email,
     role: user.role,
     expiresAt,
+    plan: user.plan || 'FREE',
   };
 
   const token = await createToken(payload);
@@ -94,7 +96,7 @@ export async function getCurrentUser(): Promise<User | null> {
         name: true,
         role: true,
         isActive: true,
-      },
+        merchantId: true,},
     });
 
     if (!user || !user.isActive) return null;
@@ -142,17 +144,54 @@ export async function destroySession() {
 }
 
 /**
- * Login user
+ * Login user scoped to a merchant.
+ *
+ * Why slug/domain instead of email alone:
+ *   Email is unique per merchant, not globally. Two merchants can
+ *   have a user with the same email address. We need an identifier
+ *   that tells us *which merchant* to look in before we even touch
+ *   the users table.
+ *
+ * Typical sources of merchantIdentifier:
+ *   - Subdomain:  acme.yourapp.com  → "acme"
+ *   - Custom domain header set by your middleware
+ *   - A "workspace" field on the login form
  */
 export async function loginUser(
   email: string,
-  password: string
+  password: string,
+  merchantIdentifier: string     // slug or custom domain
 ): Promise<{ success: boolean; error?: string; user?: User }> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { email },
+    // 1. Resolve the merchant first — fail fast if it doesn't exist
+    //    or is suspended before we do any password work.
+    const merchant = await prisma.merchant.findUnique({
+      where: { slug: merchantIdentifier },
+      select: { id: true, isActive: true, name: true, plan: true },
     });
 
+    if (!merchant) {
+      return { success: false, error: 'Workspace not found' };
+    }
+
+    if (!merchant.isActive) {
+      return { success: false, error: 'This workspace has been suspended. Contact support.' };
+    }
+
+    // 2. Look up the user scoped to that merchant.
+    //    The schema enforces @@unique([merchantId, email]) so this
+    //    query is always hitting an indexed, tenant-scoped row.
+    const user = await prisma.user.findUnique({
+      where: {
+        merchantId_email: {         // compound unique index name Prisma generates
+          merchantId: merchant.id,
+          email,
+        },
+      },
+    });
+
+    // Deliberate: same error for "no user" and "wrong password" to
+    // avoid leaking whether an email is registered on a workspace.
     if (!user) {
       return { success: false, error: 'Invalid email or password' };
     }
@@ -169,20 +208,24 @@ export async function loginUser(
 
     await createSession({
       id: user.id,
+      merchantId: user.merchantId,
       email: user.email,
       name: user.name,
       role: user.role,
       isActive: user.isActive,
+      plan: merchant.plan as MerchantPlan,
     });
 
     return {
       success: true,
       user: {
         id: user.id,
+        merchantId: user.merchantId,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: user.role,  
         isActive: user.isActive,
+        plan: merchant.plan as MerchantPlan,
       },
     };
   } catch (error) {
@@ -199,6 +242,7 @@ export async function registerUser(data: {
   name: string;
   password: string;
   role: UserRole;
+  merchantId: string;
 }): Promise<{ success: boolean; error?: string; user?: User }> {
   try {
     // Check if user already exists
@@ -220,6 +264,8 @@ export async function registerUser(data: {
         name: data.name,
         password: hashedPassword,
         role: data.role,
+        isActive: true,
+        merchantId: data.merchantId, // Assuming you have a merchantId in the registration data
       },
       select: {
         id: true,
@@ -227,6 +273,7 @@ export async function registerUser(data: {
         name: true,
         role: true,
         isActive: true,
+        merchantId: true,
       },
     });
 

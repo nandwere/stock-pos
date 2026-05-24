@@ -11,16 +11,15 @@ export async function GET(
   try {
     const session = await getSession();
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const { merchantId } = session;
+
 
     // Await the params Promise
     const { id } = await params;
     const product = await prisma.product.findUnique({
-      where: { id },
+      where: { id, merchantId },
       include: {
         category: {
           select: {
@@ -56,17 +55,15 @@ export async function PUT(
 ) {
   try {
     const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+     if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const { merchantId } = session;
 
     const { id } = await params;
     const body = await request.json();
     const existingProduct = await prisma.product.findUnique({
-      where: { id },
+      where: { id, merchantId },
       include: {
         category: {
           select: {
@@ -79,7 +76,7 @@ export async function PUT(
     });
     const { categoryId, category, ...updateData } = body;
     const existingCategory = await prisma.category.findUnique({
-      where: { id: categoryId },
+      where: { id: categoryId, merchantId },
       include: {
 
       }
@@ -90,7 +87,7 @@ export async function PUT(
 
     // Update sale logic
     const updatedSale = await prisma.product.update({
-      where: { id },
+      where: { id, merchantId },
       data: {
         ...updateData,
         categoryId: categoryId || existingCategory?.id,
@@ -116,17 +113,15 @@ export async function DELETE(
 ) {
   try {
     const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+     if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const { merchantId } = session;
 
     const { id } = await params;
 
     await prisma.product.delete({
-      where: { id }
+      where: { id, merchantId }
     });
 
     return NextResponse.json(

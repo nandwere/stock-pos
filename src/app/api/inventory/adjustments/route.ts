@@ -20,6 +20,12 @@ const createAdjustmentSchema = z.object({
 
 export async function POST(request: NextRequest) {
     try {
+        const session = await getSession();
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const { merchantId } = session;
+
         const user = await getCurrentUser();
         if (!user) {
             return NextResponse.json(
@@ -58,7 +64,7 @@ export async function POST(request: NextRequest) {
         const result = await prisma.$transaction(async (tx) => {
             // 1. Get current product
             const product = await tx.product.findUnique({
-                where: { id: productId },
+                where: { id: productId, merchantId },
                 select: { id: true, currentStock: true, name: true }
             });
 
@@ -87,6 +93,7 @@ export async function POST(request: NextRequest) {
             // 4. Create stock adjustment record
             const adjustment = await tx.stockAdjustment.create({
                 data: {
+                    merchantId,
                     productId,
                     userId,
                     type,
@@ -106,7 +113,7 @@ export async function POST(request: NextRequest) {
 
             // 5. Update product stock
             await tx.product.update({
-                where: { id: productId },
+                where: { id: productId, merchantId },
                 data: {
                     currentStock: newStock,
                     updatedAt: new Date(),
@@ -154,13 +161,11 @@ export async function POST(request: NextRequest) {
 // GET endpoint for listing adjustments
 export async function GET(request: NextRequest) {
     try {
-        const user = await getCurrentUser();
-        if (!user) {
-            return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
-            );
+        const session = await getSession();
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        const { merchantId } = session;
 
         const { searchParams } = new URL(request.url);
         const productId = searchParams.get('productId');
@@ -172,7 +177,9 @@ export async function GET(request: NextRequest) {
         const skip = (page - 1) * limit;
 
         // Build where clause
-        const where: any = {};
+        const where: any = {
+            merchantId,
+        };
 
         if (productId) {
             where.productId = productId;

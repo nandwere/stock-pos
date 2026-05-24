@@ -115,19 +115,24 @@ export function useCreateSale() {
 
   return useMutation({
     mutationFn: createSale,
-    onSuccess: (newSale) => {
+    onSuccess: async (newSale) => {
       // Invalidate sales queries
       queryClient.invalidateQueries({ queryKey: ['sales'] });
-      
+
       // Invalidate products (stock updated)
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      
+
       // Invalidate today's stats
       queryClient.invalidateQueries({ queryKey: ['sales', 'stats', 'today'] });
-      
+
+      // Tell React Query these are stale — refetch happens immediately
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      await queryClient.invalidateQueries({ queryKey: ['recent-sales'] });
+      await queryClient.invalidateQueries({ queryKey: ['low-stock-products'] });
+
       // Clear the cart
       clearCart();
-      
+
       return newSale;
     },
     onError: (error: Error) => {
@@ -139,9 +144,9 @@ export function useCreateSale() {
 /**
  * Get recent sales (last 10)
  */
-export function useRecentSales(limit: number = 10) {
+export function useRecentSales(limit: number = 10, refreshKey: number = 0) {
   return useQuery({
-    queryKey: ['sales', 'recent', limit],
+    queryKey: ['sales', 'recent', limit, refreshKey],
     queryFn: () => fetchSales(),
     select: (data) => data.slice(0, limit),
     refetchInterval: 30 * 1000, // Refetch every 30 seconds
@@ -167,12 +172,12 @@ export function useSalesSummary(startDate: string, endDate: string) {
     queryKey: ['sales', 'summary', startDate, endDate],
     queryFn: async () => {
       const sales = await fetchSales({ startDate, endDate });
-      
+
       // Calculate summary
       const totalSales = sales.reduce((sum: number, sale: any) => sum + Number(sale.total), 0);
       const totalTransactions = sales.length;
       const averageTransaction = totalSales / totalTransactions || 0;
-      
+
       const paymentBreakdown = sales.reduce((acc: any, sale: any) => {
         const method = sale.paymentMethod;
         acc[method] = (acc[method] || 0) + Number(sale.total);

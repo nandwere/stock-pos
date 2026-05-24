@@ -18,15 +18,6 @@ import { useRecentSales } from '@/lib/hooks/use-sales';
 import { useLowStockProducts } from '@/lib/hooks/use-products';
 import Link from 'next/link';
 
-interface DashboardStats {
-  todaySales: number;
-  salesCount: number;
-  lowStockItems: number;
-  totalInventoryValue: number;
-  salesChange: number;
-  activeWorkers: number;
-}
-
 export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: recentSales = [], isLoading: salesLoading } = useRecentSales(5);

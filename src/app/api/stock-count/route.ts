@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, getSession } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { merchantId } = session;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json(
@@ -20,6 +25,7 @@ export async function POST(request: NextRequest) {
         prisma.stockCount.create({
           data: {
             productId: count.productId,
+            merchantId,
             userId: user.id,
             expectedQty: count.expectedStock,
             actualQty: count.actualStock,
@@ -34,7 +40,7 @@ export async function POST(request: NextRequest) {
     await Promise.all(
       counts.map((count: any) =>
         prisma.product.update({
-          where: { id: count.productId },
+          where: { id: count.productId, merchantId },
           data: { currentStock: count.actualStock }
         })
       )

@@ -1,13 +1,18 @@
 // /Users/flag/Desktop/stock-pos-system/src/app/api/dashboard/stats/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, getSession } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
-  const startTime = Date.now();
-  console.info("[Dashboard] Request received");
-
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { merchantId } = session;
+    const startTime = Date.now();
+    console.info("[Dashboard] Request received");
+
     const user = await getCurrentUser();
 
     if (!user) {
@@ -38,6 +43,7 @@ export async function GET(request: NextRequest) {
     const todaySales = await prisma.sale.aggregate({
       where: {
         createdAt: { gte: today, lt: tomorrow },
+        merchantId,
       },
       _sum: { total: true },
       _count: true,
@@ -46,6 +52,7 @@ export async function GET(request: NextRequest) {
     const yesterdaySales = await prisma.sale.aggregate({
       where: {
         createdAt: { gte: yesterday, lt: today },
+        merchantId,
       },
       _sum: { total: true },
     });
@@ -57,8 +64,8 @@ export async function GET(request: NextRequest) {
       yesterdayTotal > 0
         ? ((todayTotal - yesterdayTotal) / yesterdayTotal) * 100
         : todayTotal > 0
-        ? 100
-        : 0;
+          ? 100
+          : 0;
 
     console.info("[Dashboard] Sales calculated", {
       todayTotal,
@@ -80,7 +87,7 @@ export async function GET(request: NextRequest) {
       select: { currentStock: true, costPrice: true },
     });
 
-    const totalInventoryValue = products.reduce((sum, product) => {
+    const totalInventoryValue = products.reduce((sum: number, product: { currentStock: any; costPrice: any; }) => {
       return sum + Number(product.currentStock) * Number(product.costPrice);
     }, 0);
 
@@ -97,12 +104,12 @@ export async function GET(request: NextRequest) {
     monthStart.setDate(monthStart.getDate() - 30);
 
     const weekSales = await prisma.sale.aggregate({
-      where: { createdAt: { gte: weekStart, lt: tomorrow } },
+      where: { createdAt: { gte: weekStart, lt: tomorrow }, merchantId },
       _sum: { total: true },
     });
 
     const monthSales = await prisma.sale.aggregate({
-      where: { createdAt: { gte: monthStart, lt: tomorrow } },
+      where: { createdAt: { gte: monthStart, lt: tomorrow }, merchantId },
       _sum: { total: true },
     });
 

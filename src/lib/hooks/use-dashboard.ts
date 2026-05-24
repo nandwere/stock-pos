@@ -26,8 +26,8 @@ export function useDashboardStats() {
       if (!response.ok) throw new Error('Failed to fetch dashboard stats');
       return response.json() as Promise<DashboardStats>;
     },
-    refetchInterval: 30 * 1000, // Refetch every minute
-    staleTime: 30 * 1000, // Consider stale after 30 seconds
+    refetchInterval: 30_000,
+    staleTime:       30_000,
   });
 }
 
@@ -42,7 +42,8 @@ export function useSalesChartData(days: number = 7) {
       if (!response.ok) throw new Error('Failed to fetch sales chart data');
       return response.json();
     },
-    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+    refetchInterval: 30_000,
+    staleTime:       30_000,
   });
 }
 
@@ -57,6 +58,7 @@ export function useQuickStats() {
       if (!response.ok) throw new Error('Failed to fetch quick stats');
       return response.json();
     },
-    refetchInterval: 30 * 1000, // Refetch every 30 seconds
+    refetchInterval: 30_000,
+    staleTime:       30_000,
   });
 }

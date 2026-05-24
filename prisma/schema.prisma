@@ -38,8 +38,54 @@ enum PaymentMethod {
   CREDIT
 }
 
+enum MerchantPlan {
+  FREE
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
+// ─────────────────────────────────────────────
+// Merchant  (tenant root)
+// ─────────────────────────────────────────────
+
+model Merchant {
+  id           String       @id @default(cuid())
+  name         String
+  slug         String       @unique   // e.g. "acme-shop" → acme-shop.yourapp.com
+  email        String       @unique   // billing / contact email
+  phone        String?
+  address      String?
+  logoUrl      String?
+  currency     String       @default("KES")
+  timezone     String       @default("Africa/Nairobi")
+  plan         MerchantPlan @default(FREE)
+  isActive     Boolean      @default(true)
+  trialEndsAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Relations
+  users        User[]
+  categories   Category[]
+  products     Product[]
+  sales        Sale[]
+  stockCounts  StockCount[]
+  adjustments  StockAdjustment[]
+  dailySummaries DailySummary[]
+  shifts       Shift[]
+  settings     Settings[]
+  otpCodes   OtpCode[]
+  paymentRequests PaymentRequest[]
+
+  @@index([slug])
+  @@index([email])
+  @@index([plan])
+}
+
 model User {
   id            String   @id @default(cuid())
+  merchantId    String
   email         String   @unique
   name          String
   role          UserRole @default(CASHIER)
@@ -48,29 +94,38 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
+  merchant      Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   sales         Sale[]
   stockCounts   StockCount[]
   adjustments   StockAdjustment[]
   shifts        Shift[]
   
+  // Email unique per merchant, not globally
+  @@unique([merchantId, email])
+  @@index([merchantId])
+  @@index([merchantId, role])
   @@index([email])
-  @@index([role])
 }
 
 model Category {
   id          String    @id @default(cuid())
+  merchantId  String
   name        String    @unique
   description String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   
+
+  merchant    Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   products    Product[]
   
-  @@index([name])
+  @@unique([merchantId, name])
+  @@index([merchantId])
 }
 
 model Product {
   id              String   @id @default(cuid())
+  merchantId      String
   name            String
   description     String?
   sku             String   @unique
@@ -85,19 +140,23 @@ model Product {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
+  merchant        Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   category        Category @relation(fields: [categoryId], references: [id])
   saleItems       SaleItem[]
   stockCounts     StockCount[]
   adjustments     StockAdjustment[]
   
-  @@index([sku])
-  @@index([barcode])
-  @@index([categoryId])
-  @@index([currentStock])
+  // SKU and barcode unique per merchant
+  @@unique([merchantId, sku])
+  @@unique([merchantId, barcode])
+  @@index([merchantId])
+  @@index([merchantId, categoryId])
+  @@index([merchantId, currentStock])
 }
 
 model Sale {
   id              String        @id @default(cuid())
+  merchantId      String
   saleNumber      String        @unique
   userId          String
   customerName    String?
@@ -111,13 +170,16 @@ model Sale {
   notes           String?
   createdAt       DateTime      @default(now())
   
+  merchant      Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   user            User          @relation(fields: [userId], references: [id])
   items           SaleItem[]
   
-  @@index([saleNumber])
-  @@index([userId])
-  @@index([createdAt])
-  @@index([paymentMethod])
+  // Sale number unique per merchant
+  @@unique([merchantId, saleNumber])
+  @@index([merchantId])
+  @@index([merchantId, userId])
+  @@index([merchantId, createdAt])
+  @@index([merchantId, paymentMethod])
 }
 
 model SaleItem {
@@ -137,6 +199,7 @@ model SaleItem {
 
 model StockCount {
   id              String   @id @default(cuid())
+  merchantId      String
   productId       String
   userId          String
   expectedQty     Decimal  @db.Decimal(10, 2)
@@ -145,16 +208,18 @@ model StockCount {
   notes           String?
   countDate       DateTime @default(now())
   
+  merchant        Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   product         Product  @relation(fields: [productId], references: [id])
   user            User     @relation(fields: [userId], references: [id])
   
-  @@index([productId])
-  @@index([userId])
-  @@index([countDate])
+  @@index([merchantId])
+  @@index([merchantId, productId])
+  @@index([merchantId, countDate])
 }
 
 model StockAdjustment {
   id              String          @id @default(cuid())
+  merchantId      String
   productId       String
   userId          String
   type            TransactionType
@@ -163,17 +228,19 @@ model StockAdjustment {
   notes           String?
   createdAt       DateTime        @default(now())
   
+  merchant        Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   product         Product         @relation(fields: [productId], references: [id])
   user            User            @relation(fields: [userId], references: [id])
   
-  @@index([productId])
-  @@index([userId])
-  @@index([createdAt])
-  @@index([type])
+  @@index([merchantId])
+  @@index([merchantId, productId])
+  @@index([merchantId, createdAt])
+  @@index([merchantId, type])
 }
 
 model DailySummary {
   id                  String   @id @default(cuid())
+  merchantId          String
   date                DateTime @unique @db.Date
   totalSales          Decimal  @db.Decimal(10, 2)
   totalCost           Decimal  @db.Decimal(10, 2)
@@ -185,12 +252,18 @@ model DailySummary {
   mobilePayments      Decimal  @db.Decimal(10, 2)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+
+  merchant            Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   
-  @@index([date])
+  // One summary per merchant per day
+  @@unique([merchantId, date])
+  @@index([merchantId])
+  @@index([merchantId, date])
 }
 
 model Shift {
   id              String   @id @default(cuid())
+  merchantId      String
   userId          String
   startTime       DateTime
   endTime         DateTime?
@@ -200,19 +273,64 @@ model Shift {
   variance        Decimal? @db.Decimal(10, 2)
   notes           String?
   
+  merchant        Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   user            User     @relation(fields: [userId], references: [id])
   
-  @@index([userId])
-  @@index([startTime])
+  @@index([merchantId])
+  @@index([merchantId, userId])
+  @@index([merchantId, startTime])
 }
 
 model Settings {
   id              String   @id @default(cuid())
+  merchantId      String
   key             String   @unique
   value           String
   description     String?
   updatedAt       DateTime @updatedAt
+
+  merchant        Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   
-  @@index([key])
+  // Key unique per merchant
+  @@unique([merchantId, key])
+  @@index([merchantId])
+}
+
+model OtpCode {
+  id         String   @id @default(cuid())
+  merchantId String
+  email      String
+  code       String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([email, merchantId])
+  @@index([code])
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+model PaymentRequest {
+  id              String        @id @default(cuid())
+  merchantId      String
+  plan            MerchantPlan
+  transactionCode String        @unique   // prevents double-submissions
+  status          PaymentStatus @default(PENDING)
+  notes           String?                 // admin can leave a rejection reason
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  merchant        Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@index([status])
+  @@index([createdAt])
 }
 

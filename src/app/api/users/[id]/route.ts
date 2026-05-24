@@ -1,17 +1,25 @@
 // src/app/api/users/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { hasPermission, getCurrentUser } from '@/lib/auth';
+import { hasPermission, getCurrentUser, getSession } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await hasPermission('users.view'))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { merchantId } = session;
+
+    // require view permission
+    if (!(await hasPermission('users.view'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const { id } = await params;
     const user = await prisma.user.findUnique({
-      where: { id },
+      where: { id, merchantId },
       select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
     });
     if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -23,6 +31,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const { merchantId } = session;
+
   if (!(await hasPermission('users.edit'))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -37,7 +51,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body.password) data.password = await bcrypt.hash(body.password, 10);
 
     const updated = await prisma.user.update({
-      where: { id },
+      where: { id, merchantId },
       data,
       select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
     });
@@ -50,6 +64,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const { merchantId } = session;
+
   if (!(await hasPermission('users.delete'))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -62,7 +82,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
       return NextResponse.json({ error: "You can't delete your own account" }, { status: 400 });
     }
 
-    await prisma.user.delete({ where: { id } });
+    await prisma.user.delete({ where: { id, merchantId } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('DELETE /api/users/[id]', error);

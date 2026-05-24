@@ -1,36 +1,126 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Stock POS
+
+A multi-tenant Point of Sale system built with Next.js, Prisma, and PostgreSQL.
+
+## Tech Stack
+
+- **Framework** — Next.js 15 (App Router)
+- **Database ORM** — Prisma
+- **Database** — PostgreSQL
+- **Auth** — JWT sessions (HTTP-only cookies)
+- **Styling** — Tailwind CSS
+
+---
 
 ## Getting Started
 
-First, run the development server:
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Set up environment variables
+
+Create a `.env` file in the root of the project:
+
+```env
+# PostgreSQL connection string
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
+
+# JWT secret — use a long random string in production
+JWT_SECRET="your-super-secret-key"
+```
+
+> **Local example**
+> `DATABASE_URL="postgresql://postgres:postgres@localhost:5432/stockpos"`
+
+### 3. Set up the database
+
+```bash
+# Apply all migrations and create the database schema
+npx prisma migrate dev --name init
+
+# (Alternative) Push the schema without creating migration files — useful for prototyping
+npx prisma db push
+```
+
+### 4. Seed the database
+
+The seed creates the **Baraka** merchant, an owner user, categories, products, and default settings.
+
+```bash
+npx prisma db seed
+```
+
+Default login after seeding:
+
+| Field    | Value                  |
+|----------|------------------------|
+| Email    | `nandwere@baraka.com`  |
+| Password | `art123`               |
+| Role     | `OWNER`                |
+
+### 5. Run the development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Prisma Workflows
 
-## Learn More
+### Viewing and editing data (Prisma Studio)
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npx prisma studio
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Opens a visual browser interface at [http://localhost:5555](http://localhost:5555) where you can browse and edit every table.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Modifying the schema
 
-## Deploy on Vercel
+1. Edit `prisma/schema.prisma`
+2. Create and apply a migration:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npx prisma migrate dev --name describe_your_change
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This will:
+- Generate a SQL migration file under `prisma/migrations/`
+- Apply it to your local database
+- Regenerate the Prisma Client
+
+### Regenerating the Prisma Client
+
+Run this whenever `schema.prisma` changes and you need the TypeScript types to update without running a migration (e.g. after a `git pull`):
+
+```bash
+npx prisma generate
+```
+
+### Resetting the database
+
+Drops and recreates the database, re-applies all migrations, and re-runs the seed:
+
+```bash
+npx prisma migrate reset
+```
+
+> ⚠️ This deletes all data. Development only.
+
+### Applying migrations in production
+
+```bash
+npx prisma migrate deploy
+```
+
+Unlike `migrate dev`, this never prompts interactively and never resets data — safe for CI/CD pipelines.
+
+---
+
+## Project Structure

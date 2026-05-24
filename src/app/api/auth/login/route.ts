@@ -14,7 +14,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await loginUser(email, password);
+    // Resolved by middleware — never comes from the request body
+    const merchantSlug = request.headers.get('x-merchant-slug') ?? 'baraka';
+
+    const result = await loginUser(email, password, merchantSlug);
 
     if (!result.success) {
       return NextResponse.json(
@@ -24,9 +27,9 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { 
+      {
         success: true,
-        user: result.user 
+        user: result.user
       },
       { status: 200 }
     );

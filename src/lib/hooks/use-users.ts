@@ -11,6 +11,14 @@ async function fetchUsers() {
   return data?.data;
 }
 
+async function fetchMerchantsUsers() {
+  const response = await fetch('/api/users/merchant');
+  if (!response.ok) throw new Error('Failed to fetch merchants users');
+
+  const data = await response.json();
+  return data?.data;
+}
+
 async function fetchUserById(id: string) {
   const response = await fetch(`/api/users/${id}`);
   if (!response.ok) throw new Error('Failed to fetch product');
@@ -57,6 +65,20 @@ export function useUsers() {
   return useQuery({
     queryKey: ['users'],
     queryFn: fetchUsers,
+  });
+}
+
+/**
+ * Fetch all merchants user
+ */
+export function useMerchantsUsers() {
+  const setUsers = useUserStore(state => state.setUsers);
+  const setLoading = useUserStore(state => state.setLoading);
+  const setError = useUserStore(state => state.setError);
+
+  return useQuery({
+    queryKey: ['merchants-users'],
+    queryFn: fetchMerchantsUsers,
   });
 }
 

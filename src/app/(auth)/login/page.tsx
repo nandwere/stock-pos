@@ -110,17 +110,15 @@ export default function LoginPage() {
                 'Sign In'
               )}
             </button>
-          </form>
-
-          {/* Demo Credentials */}
-          {/* <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <p className="text-xs font-semibold text-gray-700 mb-2">Demo Credentials:</p>
-            <div className="space-y-1 text-xs text-gray-600">
-              <p><strong>Owner:</strong> owner@shop.com / admin123</p>
-              <p><strong>Manager:</strong> manager@shop.com / manager123</p>
-              <p><strong>Cashier:</strong> cashier@shop.com / cashier123</p>
+            <div className="text-center">
+              <Link
+                href="/forgot-password"
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Forgot your password?
+              </Link>
             </div>
-          </div> */}
+          </form>
         </div>
 
         {/* Footer */}

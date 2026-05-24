@@ -1,16 +1,21 @@
 // src/app/api/users/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { hasPermission, getCurrentUser } from '@/lib/auth';
+import { hasPermission, getCurrentUser, getSession } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 
 export async function GET(request: NextRequest) {
-  // require view permission
-  if (!(await hasPermission('users.view'))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // require view permission
+    if (!(await hasPermission('users.view'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const url = new URL(request.url);
     const q = url.searchParams.get('q')?.trim();
     const role = url.searchParams.get('role');
@@ -19,7 +24,7 @@ export async function GET(request: NextRequest) {
     const pageSize = Number(url.searchParams.get('pageSize') ?? 20);
     const skip = (page - 1) * pageSize;
 
-    const where: any = {};
+    const where: any = { };
     if (q) {
       where.OR = [
         { name: { contains: q, mode: 'insensitive' } },
@@ -32,10 +37,15 @@ export async function GET(request: NextRequest) {
     const [data, total] = await Promise.all([
       prisma.user.findMany({
         where,
-        select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
+        // select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true, merchantId: true },
         orderBy: { createdAt: 'desc' },
         take: pageSize,
         skip,
+        include: {
+          merchant: {
+            select: { id: true, name: true },
+          },
+        },
       }),
       prisma.user.count({ where }),
     ]);
@@ -48,12 +58,19 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  // require create permission (owner)
-  if (!(await hasPermission('users.create'))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { merchantId } = session;
+
+    // require create permission (owner)
+    if (!(await hasPermission('users.create'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+
     const body = await request.json();
     const { email, name, role, password } = body;
 
@@ -61,7 +78,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findUnique({ where: { email, merchantId } });
     if (existing) {
       return NextResponse.json({ error: 'User with this email already exists' }, { status: 409 });
     }
@@ -69,8 +86,8 @@ export async function POST(request: NextRequest) {
     const hashed = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
-      data: { email, name, role, password: hashed },
-      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
+      data: { email, name, role, password: hashed, merchantId },
+      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true, merchantId: true },
     });
 
     return NextResponse.json(user, { status: 201 });

@@ -1,9 +1,15 @@
 // app/api/stock-counts/reports/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { merchantId } = session;
     // Parse request body
     const body = await request.json();
     const { startDate, endDate } = body;
@@ -28,6 +34,7 @@ export async function POST(request: NextRequest) {
           gte: start,
           lte: end,
         },
+        merchantId,
       },
       include: {
         product: {
@@ -49,12 +56,12 @@ export async function POST(request: NextRequest) {
     });
 
     // Transform data for frontend
-    const reports = stockCounts.map(count => {
+    const reports = stockCounts.map((count: { expectedQty: any; actualQty: any; variance: any; product: { sellingPrice: any; name: any; sku: any; }; id: any; productId: any; user: { name: any; }; notes: any; countDate: any; }) => {
       const expectedQty = Number(count.expectedQty);
       const actualQty = Number(count.actualQty);
       const variance = Number(count.variance);
       const productPrice = count.product?.sellingPrice ? Number(count.product.sellingPrice) : 0;
-      
+
       const missingStock = variance < 0 ? Math.abs(variance) : 0;
       const excessStock = variance > 0 ? variance : 0;
       const estimatedLoss = missingStock * productPrice;
@@ -83,7 +90,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(reports);
-    
+
   } catch (error) {
     console.error('Error fetching stock count reports:', error);
     return NextResponse.json(

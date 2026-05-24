@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateSaleNumber } from '@/lib/stock-calculations';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, getSession } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { merchantId } = session;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json(
@@ -21,7 +26,7 @@ export async function POST(request: NextRequest) {
     // Validate stock before transaction
     for (const item of items) {
       const product = await prisma.product.findUnique({
-        where: { id: item.productId },
+        where: { id: item.productId, merchantId },
         select: { currentStock: true, name: true }
       });
 
@@ -50,11 +55,12 @@ export async function POST(request: NextRequest) {
     const total = subtotal;
 
     // Create sale in transaction
-    const sale = await prisma.$transaction(async (tx: { sale: { create: (arg0: { data: { saleNumber: string; userId: string; customerName: any; paymentMethod: any; subtotal: any; total: any; amountPaid: any; items: { create: any; }; }; include: { items: boolean; }; }) => any; }; product: { update: (arg0: { where: { id: any; }; data: { currentStock: { decrement: any; }; }; select: { id: boolean; name: boolean; currentStock: boolean; }; }) => any; }; }) => {
+    const sale = await prisma.$transaction(async (tx) => {
       // Create sale
       const newSale = await tx.sale.create({
         data: {
           saleNumber: generateSaleNumber(),
+          merchantId,
           userId: user.id,
           customerName,
           paymentMethod,
@@ -81,7 +87,7 @@ export async function POST(request: NextRequest) {
           console.log(`Updating stock for product ${item.productId}, decrement by ${item.quantity}`);
 
           const updated = await tx.product.update({
-            where: { id: item.productId },
+            where: { id: item.productId, merchantId },
             data: {
               currentStock: { decrement: item.quantity }
             },
@@ -106,7 +112,7 @@ export async function POST(request: NextRequest) {
     // Verify final stock levels
     for (const item of items) {
       const finalProduct = await prisma.product.findUnique({
-        where: { id: item.productId },
+        where: { id: item.productId, merchantId },
         select: { name: true, currentStock: true }
       });
       console.log(`Final stock for ${finalProduct?.name}: ${finalProduct?.currentStock}`);
@@ -128,6 +134,12 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { merchantId } = session;
+
     const url = new URL(request.url);
     const q = url.searchParams.get('q')?.trim();
     const take = Number(url.searchParams.get('take') ?? 50);
@@ -145,7 +157,7 @@ export async function GET(request: NextRequest) {
       skip
     });
 
-    const where: any = {};
+    const where: any = { merchantId };
     if (q) {
       where.OR = [
         { saleNumber: { contains: q, mode: 'insensitive' } },
@@ -188,7 +200,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.sale.count({ where }),
     ]);
-     console.log(`Fetched ${sales.length} sales, total matching: ${total}`);
+    console.log(`Fetched ${sales.length} sales, total matching: ${total}`);
     console.log('Applied filters:', {
       hasSearch: !!q,
       hasPaymentMethod: !!paymentMethod,
