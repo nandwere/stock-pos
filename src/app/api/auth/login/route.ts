@@ -17,8 +17,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Resolved by middleware — never comes from the request body
-    const merchantSlug = request.headers.get('x-merchant-slug') ?? 'test';
+    const merchantSlug = request.headers.get('x-merchant-slug');
     console.log('Login attempt for merchant slug:', merchantSlug);  
+
+    if (!merchantSlug) {
+      return NextResponse.json(
+        { error: 'Merchant identifier missing' },
+        { status: 400 }
+      );
+    }
 
     const result = await loginUser(email, password, merchantSlug);
 

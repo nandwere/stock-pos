@@ -29,6 +29,7 @@ const FEATURE_GATES: Record<string, Feature> = {
 
 function resolveMerchantSlug(request: NextRequest): string {
   const hostname = request.nextUrl.hostname;
+  console.log('Resolving merchant slug for hostname:', hostname);
   return HOSTNAME_TO_SLUG[hostname] ?? DEFAULT_SLUG;
 }
 

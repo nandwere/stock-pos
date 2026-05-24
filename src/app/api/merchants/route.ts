@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
           name: ownerName,
           email: ownerEmail,
           password: hashedPassword,
-          role: 'OWNER',
+          role: 'MANAGER', // Default to MANAGER since OWNER is reserved for platform-level admins
         },
         select: { id: true, name: true, email: true, role: true },
       });
