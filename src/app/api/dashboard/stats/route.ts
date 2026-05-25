@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
 
     // Inventory value
     const products = await prisma.product.findMany({
-      where: { isActive: true },
+      where: { isActive: true, merchantId },
       select: { currentStock: true, costPrice: true },
     });
 
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
 
     // Active workers
     const activeWorkers = await prisma.user.count({
-      where: { isActive: true },
+      where: { isActive: true, merchantId },
     });
 
     // Week / Month sales
