@@ -30,7 +30,7 @@ const FEATURE_GATES: Record<string, Feature> = {
 
 function resolveMerchantSlug(request: NextRequest): string {
   const hostname = request.headers.get('x-forwarded-host') ?? request.nextUrl.hostname;
-  console.log('Resolving merchant slug for hostname:', hostname);
+  // console.log('Resolving merchant slug for hostname:', hostname);
   return HOSTNAME_TO_SLUG[hostname] ?? DEFAULT_SLUG;
 }
 
@@ -41,7 +41,7 @@ const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password'];
 // ── Middleware ─────────────────────────────────────────────────────
 export async function middleware(request: NextRequest) {
   console.log('Middleware running for path:', request.nextUrl.pathname);
-  console.log('All headers:', Object.fromEntries(request.headers));
+  // console.log('All headers:', Object.fromEntries(request.headers));
 
   const { pathname } = request.nextUrl;
   const slug = resolveMerchantSlug(request);

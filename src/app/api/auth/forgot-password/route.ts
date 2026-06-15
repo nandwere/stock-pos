@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
 
   // Always return success to prevent email enumeration
   if (!user || !user.isActive) {
+    console.log("No active user found for email:", email);
     return NextResponse.json({ success: true });
   }
 
@@ -32,6 +33,8 @@ export async function POST(request: NextRequest) {
 
   const code      = generateOtp();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+  console.log(`Generated OTP for ${email}: ${code} (expires at ${expiresAt.toISOString()})`);
 
   await prisma.otpCode.create({
     data: { merchantId: merchant.id, email, code, expiresAt },

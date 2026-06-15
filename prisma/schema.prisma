@@ -77,6 +77,9 @@ model Merchant {
   settings     Settings[]
   otpCodes   OtpCode[]
   paymentRequests PaymentRequest[]
+  suppliers        Supplier[]
+  expenses         Expense[]
+  expenseCategories ExpenseCategory[]
 
   @@index([slug])
   @@index([email])
@@ -99,6 +102,8 @@ model User {
   stockCounts   StockCount[]
   adjustments   StockAdjustment[]
   shifts        Shift[]
+  expenses         Expense[]
+  expenseApprovals ExpenseApproval[]
   
   // Email unique per merchant, not globally
   @@unique([merchantId, email])
@@ -145,6 +150,9 @@ model Product {
   saleItems       SaleItem[]
   stockCounts     StockCount[]
   adjustments     StockAdjustment[]
+  // In Product model — add relation:
+  supplierId       String?
+  supplier         Supplier? @relation(fields: [supplierId], references: [id])
   
   // SKU and barcode unique per merchant
   @@unique([merchantId, sku])
@@ -334,3 +342,136 @@ model PaymentRequest {
   @@index([createdAt])
 }
 
+
+// ── Suppliers ────────────────────────────────────────────────────────────────
+
+model Supplier {
+  id          String   @id @default(cuid())
+  merchantId  String
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  contactName String?
+  taxPin      String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  merchant    Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  expenses    Expense[]
+  products    Product[] // supplier can be linked to products
+
+  @@unique([merchantId, name])
+  @@index([merchantId])
+  @@index([merchantId, isActive])
+}
+
+// ── Expense Categories ───────────────────────────────────────────────────────
+
+model ExpenseCategory {
+  id          String   @id @default(cuid())
+  merchantId  String
+  name        String
+  description String?
+  color       String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  merchant    Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  expenses    Expense[]
+
+  @@unique([merchantId, name])
+  @@index([merchantId])
+}
+
+// ── Expenses ─────────────────────────────────────────────────────────────────
+
+enum ExpenseStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PAID
+  VOIDED
+}
+
+enum ExpenseType {
+  OPERATIONAL
+  CAPITAL
+  RECURRING
+  ONE_TIME
+}
+
+model Expense {
+  id               String        @id @default(cuid())
+  merchantId       String
+  userId           String
+  supplierId       String?
+  categoryId       String?
+  expenseNumber    String
+  type             ExpenseType   @default(OPERATIONAL)
+  status           ExpenseStatus @default(DRAFT)
+  description      String
+  amount           Decimal       @db.Decimal(10, 2)
+  tax              Decimal       @db.Decimal(10, 2) @default(0)
+  total            Decimal       @db.Decimal(10, 2)
+  currency         String        @default("KES")
+  expenseDate      DateTime
+  dueDate          DateTime?
+  paidAt           DateTime?
+  paymentMethod    PaymentMethod?
+  paymentReference String?
+  receiptUrl       String?
+  notes            String?
+  isRecurring      Boolean       @default(false)
+  recurringDay     Int?          // day of month for recurring
+  tags             String[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  merchant         Merchant         @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  user             User             @relation(fields: [userId], references: [id])
+  supplier         Supplier?        @relation(fields: [supplierId], references: [id])
+  category         ExpenseCategory? @relation(fields: [categoryId], references: [id])
+  approvals        ExpenseApproval[]
+  items            ExpenseItem[]
+
+  @@unique([merchantId, expenseNumber])
+  @@index([merchantId])
+  @@index([merchantId, status])
+  @@index([merchantId, supplierId])
+  @@index([merchantId, categoryId])
+  @@index([merchantId, expenseDate])
+  @@index([merchantId, type])
+}
+
+model ExpenseItem {
+  id          String   @id @default(cuid())
+  expenseId   String
+  description String
+  quantity    Decimal  @db.Decimal(10, 2)
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  subtotal    Decimal  @db.Decimal(10, 2)
+
+  expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@index([expenseId])
+}
+
+model ExpenseApproval {
+  id         String   @id @default(cuid())
+  expenseId  String
+  approverId String
+  status     String   // APPROVED | REJECTED
+  comment    String?
+  decidedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  expense    Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  approver   User     @relation(fields: [approverId], references: [id])
+
+  @@index([expenseId])
+  @@index([approverId])
+}

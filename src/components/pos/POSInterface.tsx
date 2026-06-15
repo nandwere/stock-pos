@@ -1,7 +1,7 @@
 // components/pos/POSInterfaceWithState.tsx
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Search,
   Trash2,
@@ -35,8 +35,24 @@ export function POSInterface() {
   const getCartTotal = usePOSStore(state => state.getCartTotal);
 
   // React Query
-  const { data: products = [], isLoading, error } = useProducts() as { data: Product[], isLoading: boolean, error: any };
+  // const { data: products = [], isLoading, error } = useProducts() as { data: Product[], isLoading: boolean, error: any };
+    const { data: products = [], isLoading, error } = useProducts({
+    q: searchQuery.trim() || undefined,
+  }) as { data: Product[]; isLoading: boolean; error: any };
+  
   const createSale = useCreateSale();
+
+  // 👇 Client-side fallback filter — covers cases where the API
+  //    doesn't support 'q', or for instant feedback before debounce
+  const filteredProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter(p =>
+      p.name.toLowerCase().includes(q)    ||
+      p.sku.toLowerCase().includes(q)     ||
+      (p.barcode ?? '').toLowerCase().includes(q)
+    );
+  }, [products, searchQuery]);
 
   const totals = getCartTotal();
 
@@ -82,7 +98,25 @@ export function POSInterface() {
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
             />
+
+             {/* 👇 Clear button — instant reset */}
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
+          {/* 👇 Live result count feedback */}
+          {searchQuery.trim() && (
+            <p className="text-xs text-gray-500 mt-2 pl-1">
+              {filteredProducts.length === 0
+                ? 'No products match your search'
+                : `${filteredProducts.length} product${filteredProducts.length !== 1 ? 's' : ''} found`}
+            </p>
+          )}
         </div>
 
         {/* Products Grid */}

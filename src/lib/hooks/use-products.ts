@@ -4,8 +4,9 @@ import { useInventoryStore } from '@/lib/stores/inventory-store';
 import { Product } from '@/types';
 
 // API functions
-async function fetchProducts() {
-  const response = await fetch('/api/inventory');
+async function fetchProducts(queryParams?: { q?: string }) {
+  console.log('Fetching products with query params:', queryParams);
+  const response = await fetch('/api/inventory' + (queryParams?.q ? `?q=${encodeURIComponent(queryParams.q)}` : ''));
   if (!response.ok) throw new Error('Failed to fetch products');
 
   const data = await response.json();
@@ -59,14 +60,14 @@ async function deleteProduct(id: string) {
 /**
  * Fetch all products
  */
-export function useProducts() {
+export function useProducts(queryParams?: { q?: string }) {
   const setProducts = useInventoryStore(state => state.setProducts);
   const setLoading = useInventoryStore(state => state.setLoading);
   const setError = useInventoryStore(state => state.setError);
 
   return useQuery({
-    queryKey: ['products'],
-    queryFn: fetchProducts,
+    queryKey: ['products', queryParams?.q],
+    queryFn: () => fetchProducts(queryParams),
   });
 }
 
@@ -164,7 +165,7 @@ export function useDeleteProduct() {
 export function useProductsSearch(searchQuery: string) {
   return useQuery({
     queryKey: ['products', 'search', searchQuery],
-    queryFn: () => fetchProducts(),
+    queryFn: () => fetchProducts({ q: searchQuery } as { q: string }),
     select: (data) => {
       if (!searchQuery) return data;
 
