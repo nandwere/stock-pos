@@ -40,13 +40,11 @@ const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password'];
 
 // ── Middleware ─────────────────────────────────────────────────────
 export async function middleware(request: NextRequest) {
-  console.log('Middleware running for path:', request.nextUrl.pathname);
   // console.log('All headers:', Object.fromEntries(request.headers));
 
   const { pathname } = request.nextUrl;
   const slug = resolveMerchantSlug(request);
 
-  console.log(`Middleware: ${request.method} ${pathname} (slug: ${slug})`);
   // API routes — only stamp the slug, skip all auth/redirect logic
   if (pathname.startsWith('/api')) {
     const response = NextResponse.next();
@@ -77,7 +75,7 @@ export async function middleware(request: NextRequest) {
   try {
     const payload = await verifyToken(token);
 
-    console.log('Middleware auth payload:', payload);
+    // console.log('Middleware auth payload:', payload);
 
     // Expired or invalid payload → clear cookie, redirect to login
     if (!payload || new Date(payload.expiresAt) < new Date()) {
@@ -93,14 +91,13 @@ export async function middleware(request: NextRequest) {
       return withSlug(NextResponse.redirect(new URL('/', request.url)));
     }
 
-    console.log('Checking feature gate for route:', pathname);
+    // console.log('Checking feature gate for route:', pathname);
     // Feature gate check
     const requiredFeature = Object.entries(FEATURE_GATES).find(([route]) =>
       pathname.startsWith(route)
     )?.[1];
 
-    console.log('Required feature for this route:', requiredFeature);
-
+    // console.log('Required feature for this route:', requiredFeature);
     if (requiredFeature && !hasFeature(payload.plan as Plan, requiredFeature)) {
       return withSlug(NextResponse.redirect(new URL('/upgrade', request.url)));
     }

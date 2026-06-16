@@ -11,6 +11,7 @@ import {
   BarChart3,
   Users,
   Settings,
+  Tag,
   ShoppingBag,
   Building2,
 } from 'lucide-react';
@@ -60,10 +61,18 @@ const navigationItems: NavItem[] = [
     group: 'expenses'
   },
   {
+    href: '/expenses/categories',
+    label: 'Exp. Categories',
+    icon: Tag,
+    group: 'expenses',
+    roles: ['OWNER', 'MANAGER'],
+  },
+  {
     href: '/expenses/summary',
     label: 'Expense Summary',
     icon: BarChart3,
-    group: 'expenses'
+    group: 'expenses',
+    roles: ['OWNER', 'MANAGER'],
   },
   {
     href: '/inventory',
