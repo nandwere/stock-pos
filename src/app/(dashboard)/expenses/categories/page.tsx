@@ -22,7 +22,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { Plus, Tag, Pencil, Trash2, Sprout, Loader2, Lock } from 'lucide-react';
-import { DialogContent } from '@radix-ui/react-dialog';
 // Lightweight local zod resolver to avoid dependency on '@hookform/resolvers/zod'
 // Custom zod resolver to avoid dependency on @hookform/resolvers/zod
 const zodResolver = (schema: any) => async (values: any) => {
@@ -48,7 +47,7 @@ const SWATCHES = [
 function useCreateCategory() {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: (data: any) => fetch('/expenses/categories', {
+        mutationFn: (data: any) => fetch('/api/expenses/categories', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
@@ -65,7 +64,7 @@ function useUpdateCategory() {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: ({ id, ...data }: any) =>
-            fetch(`/expenses/categories/${id}`, {
+            fetch(`/api/expenses/categories/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
@@ -81,7 +80,7 @@ function useUpdateCategory() {
 function useDeleteCategory() {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: (id: string) => fetch(`/expenses/categories/${id}`, {
+        mutationFn: (id: string) => fetch(`/api/expenses/categories/${id}`, {
             method: 'DELETE',
         }).then(r => r.json()),
         onSuccess: () => {
