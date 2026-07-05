@@ -196,7 +196,7 @@ export function calculateChange(
   amountPaid: number
 ): number {
   const change = amountPaid - total;
-  return Number(Math.max(0, change).toFixed(2));
+  return Number(Math.max(0, change).toFixed(3));
 }
 
 /**
@@ -249,8 +249,8 @@ export function calculatePercentageChange(
   const percentageChange = (change / previousValue) * 100;
 
   return {
-    change: Number(change.toFixed(2)),
-    percentageChange: Number(percentageChange.toFixed(2)),
+    change: Number(change.toFixed(3)),
+    percentageChange: Number(percentageChange.toFixed(3)),
     isIncrease: change >= 0
   };
 }

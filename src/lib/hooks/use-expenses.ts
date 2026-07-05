@@ -187,7 +187,11 @@ export function useExpenseAction() {
             paymentMethod?: string;
             paymentReference?: string;
         }) => {
-            const response = await fetch(`/api/expenses/${id}/actions`);
+            const response = await fetch(`/api/expenses/${id}/actions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
             if (!response.ok) throw new Error('Failed to fetch expense actions');
             return await response.json();
         },
@@ -198,5 +202,5 @@ export function useExpenseAction() {
             toast.success('Expense updated');
         },
         onError: (err: any) => toast.error(err.response?.data?.error ?? 'Action failed'),
-    });
+    });        
 }

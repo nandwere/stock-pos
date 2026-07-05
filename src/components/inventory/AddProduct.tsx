@@ -16,7 +16,6 @@ import { useInventoryStore } from '@/lib/stores/inventory-store';
 import { useCategories, useCreateProduct, useProduct, useUpdateProduct } from '@/lib/hooks/use-products';
 import { Category } from '@/types';
 import { useToast } from '../ui/toast-provider';
-import { useQuery } from '@tanstack/react-query';
 import Loading from '@/app/(dashboard)/inventory/[id]/edit/loading';
 
 interface FormData {
@@ -33,7 +32,7 @@ interface FormData {
   isActive: boolean;
 }
 
-const UNITS = ['pcs', 'kg', 'g', 'L', 'mL', 'm', 'cm', 'box', 'pack', 'bottle'];
+const UNITS = ['pcs', 'kg', 'g', 'l', 'ml', 'm', 'cm', 'box', 'pack', 'bottle'];
 
 export default function AddProductPage() {
   const params = useParams();
@@ -91,8 +90,8 @@ export default function AddProductPage() {
   const costPrice = parseFloat(formData.costPrice) || 0;
   const sellingPrice = parseFloat(formData.sellingPrice) || 0;
   const margin = sellingPrice > 0
-    ? ((sellingPrice - costPrice) / sellingPrice * 100).toFixed(2)
-    : '0.00';
+    ? ((sellingPrice - costPrice) / sellingPrice * 100).toFixed(3)
+    : '0.000';
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof FormData, string>> = {};
@@ -404,13 +403,13 @@ export default function AddProductPage() {
                     <span className="absolute left-3 top-2.5 text-gray-500">$</span>
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.001"
                       min="0"
                       value={formData.costPrice}
                       onChange={(e) => handleChange('costPrice', e.target.value)}
                       className={`w-full pl-8 pr-4 py-2 border text-gray-900 placeholder-gray-400  rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.costPrice ? 'border-red-500' : 'border-gray-300'
                         }`}
-                      placeholder="0.00"
+                      placeholder="0.000"
                     />
                   </div>
                   {errors.costPrice && (
@@ -430,13 +429,13 @@ export default function AddProductPage() {
                     <span className="absolute left-3 top-2.5 text-gray-500">$</span>
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.001"
                       min="0"
                       value={formData.sellingPrice}
                       onChange={(e) => handleChange('sellingPrice', e.target.value)}
                       className={`w-full pl-8 pr-4 py-2 text-gray-900 placeholder-gray-400  border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.sellingPrice ? 'border-red-500' : 'border-gray-300'
                         }`}
-                      placeholder="0.00"
+                      placeholder="0.000"
                     />
                   </div>
                   {errors.sellingPrice && (
@@ -476,12 +475,12 @@ export default function AddProductPage() {
                   <input
                     type="number"
                     min="0"
-                    step={'0.01'}
+                    step={'0.001'}
                     value={formData.currentStock}
                     onChange={(e) => handleChange('currentStock', e.target.value)}
                     className={`w-full px-4 py-2 border text-gray-900 placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.currentStock ? 'border-red-500' : 'border-gray-300'
                       }`}
-                    placeholder="0"
+                    placeholder="0.000"
                   />
                   {errors.currentStock && (
                     <p className="text-sm text-red-600 flex items-center gap-1">
@@ -499,6 +498,7 @@ export default function AddProductPage() {
                   <input
                     type="number"
                     min="0"
+                    step="0.001"
                     value={formData.reorderLevel}
                     onChange={(e) => handleChange('reorderLevel', e.target.value)}
                     className={`w-full px-4 py-2 border text-gray-900 placeholder-gray-400  rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.reorderLevel ? 'border-red-500' : 'border-gray-300'

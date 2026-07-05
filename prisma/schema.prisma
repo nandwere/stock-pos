@@ -136,8 +136,8 @@ model Product {
   sku             String   @unique
   barcode         String?  @unique
   categoryId      String
-  costPrice       Decimal  @db.Decimal(10, 2)
-  sellingPrice    Decimal  @db.Decimal(10, 2)
+  costPrice       Decimal  @db.Decimal(10, 3)
+  sellingPrice    Decimal  @db.Decimal(10, 3)
   currentStock  Decimal  @default(0)
   reorderLevel  Decimal  @default(0) 
   unit            String
@@ -169,12 +169,12 @@ model Sale {
   userId          String
   customerName    String?
   paymentMethod   PaymentMethod
-  subtotal        Decimal       @db.Decimal(10, 2)
-  tax             Decimal       @db.Decimal(10, 2) @default(0)
-  discount        Decimal       @db.Decimal(10, 2) @default(0)
-  total           Decimal       @db.Decimal(10, 2)
-  amountPaid      Decimal       @db.Decimal(10, 2)
-  change          Decimal       @db.Decimal(10, 2) @default(0)
+  subtotal        Decimal       @db.Decimal(10, 3)
+  tax             Decimal       @db.Decimal(10, 3) @default(0)
+  discount        Decimal       @db.Decimal(10, 3) @default(0)
+  total           Decimal       @db.Decimal(10, 3)
+  amountPaid      Decimal       @db.Decimal(10, 3)
+  change          Decimal       @db.Decimal(10, 3) @default(0)
   notes           String?
   createdAt       DateTime      @default(now())
   
@@ -194,9 +194,9 @@ model SaleItem {
   id              String   @id @default(cuid())
   saleId          String
   productId       String
-  quantity        Decimal  @db.Decimal(10, 2)
-  unitPrice       Decimal  @db.Decimal(10, 2)
-  subtotal        Decimal  @db.Decimal(10, 2)
+  quantity        Decimal  @db.Decimal(10, 3)
+  unitPrice       Decimal  @db.Decimal(10, 3)
+  subtotal        Decimal  @db.Decimal(10, 3)
   
   sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product         Product  @relation(fields: [productId], references: [id])
@@ -210,9 +210,9 @@ model StockCount {
   merchantId      String
   productId       String
   userId          String
-  expectedQty     Decimal  @db.Decimal(10, 2)
-  actualQty       Decimal  @db.Decimal(10, 2)
-  variance        Decimal  @db.Decimal(10, 2)
+  expectedQty     Decimal  @db.Decimal(10, 3)
+  actualQty       Decimal  @db.Decimal(10, 3)
+  variance        Decimal  @db.Decimal(10, 3)
   notes           String?
   countDate       DateTime @default(now())
   
@@ -231,7 +231,7 @@ model StockAdjustment {
   productId       String
   userId          String
   type            TransactionType
-  quantity        Decimal  @db.Decimal(10, 2)
+  quantity        Decimal  @db.Decimal(10, 3)
   reason          String
   notes           String?
   createdAt       DateTime        @default(now())
@@ -250,14 +250,14 @@ model DailySummary {
   id                  String   @id @default(cuid())
   merchantId          String
   date                DateTime @unique @db.Date
-  totalSales          Decimal  @db.Decimal(10, 2)
-  totalCost           Decimal  @db.Decimal(10, 2)
-  grossProfit         Decimal  @db.Decimal(10, 2)
-  recordedSales       Decimal  @db.Decimal(10, 2)
-  estimatedSales      Decimal  @db.Decimal(10, 2)
-  cashSales           Decimal  @db.Decimal(10, 2)
-  cardSales           Decimal  @db.Decimal(10, 2)
-  mobilePayments      Decimal  @db.Decimal(10, 2)
+  totalSales          Decimal  @db.Decimal(10, 3)
+  totalCost           Decimal  @db.Decimal(10, 3)
+  grossProfit         Decimal  @db.Decimal(10, 3)
+  recordedSales       Decimal  @db.Decimal(10, 3)
+  estimatedSales      Decimal  @db.Decimal(10, 3)
+  cashSales           Decimal  @db.Decimal(10, 3)
+  cardSales           Decimal  @db.Decimal(10, 3)
+  mobilePayments      Decimal  @db.Decimal(10, 3)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -275,10 +275,10 @@ model Shift {
   userId          String
   startTime       DateTime
   endTime         DateTime?
-  openingCash     Decimal  @db.Decimal(10, 2)
-  closingCash     Decimal? @db.Decimal(10, 2)
-  expectedCash    Decimal? @db.Decimal(10, 2)
-  variance        Decimal? @db.Decimal(10, 2)
+  openingCash     Decimal  @db.Decimal(10, 3)
+  closingCash     Decimal? @db.Decimal(10, 3)
+  expectedCash    Decimal? @db.Decimal(10, 3)
+  variance        Decimal? @db.Decimal(10, 3)
   notes           String?
   
   merchant        Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
@@ -414,9 +414,9 @@ model Expense {
   type             ExpenseType   @default(OPERATIONAL)
   status           ExpenseStatus @default(DRAFT)
   description      String
-  amount           Decimal       @db.Decimal(10, 2)
-  tax              Decimal       @db.Decimal(10, 2) @default(0)
-  total            Decimal       @db.Decimal(10, 2)
+  amount           Decimal       @db.Decimal(10, 3)
+  tax              Decimal       @db.Decimal(10, 3) @default(0)
+  total            Decimal       @db.Decimal(10, 3)
   currency         String        @default("KES")
   expenseDate      DateTime
   dueDate          DateTime?
@@ -451,9 +451,9 @@ model ExpenseItem {
   id          String   @id @default(cuid())
   expenseId   String
   description String
-  quantity    Decimal  @db.Decimal(10, 2)
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  subtotal    Decimal  @db.Decimal(10, 2)
+  quantity    Decimal  @db.Decimal(10, 3)
+  unitPrice   Decimal  @db.Decimal(10, 3)
+  subtotal    Decimal  @db.Decimal(10, 3)
 
   expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
 

@@ -8,6 +8,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const { action, comment, paymentMethod, paymentReference } = await request.json();
 
+  console.log('action:', action, 'comment:', comment, 'paymentMethod:', paymentMethod, 'paymentReference:', paymentReference);  
+
   const expense = await prisma.expense.findFirst({
     where: { id: (await params).id, merchantId: session.merchantId },
   });
