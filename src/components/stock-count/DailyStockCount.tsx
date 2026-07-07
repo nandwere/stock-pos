@@ -29,14 +29,14 @@ export function DailyStockCount() {
     data: Product[],
     isLoading: boolean
   };
-  const { data: todaySales = [], isLoading: salesLoading } = useTodaySales();
+  const { data: todaySales, isLoading: salesLoading } = useTodaySales();
   const createStockCount = useCreateStockCount();
 
   const loadData = async () => {
     if (products.length === 0) return;
 
     // Calculate sales per product from today's sales
-    const salesByProduct = calculateSalesByProduct(todaySales);
+    const salesByProduct = calculateSalesByProduct(todaySales?.data);
 
     // Get opening stock from database (you'll need an API for this)
     // For now, we'll use current stock as a placeholder
