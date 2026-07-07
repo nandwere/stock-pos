@@ -47,7 +47,7 @@ export function SalesList() {
     const [dateTo, setDateTo] = useState<string>(toDateInput(todayEnd()));
     const [paymentMethod, setPaymentMethod] = useState('All');
     const [activeRange, setActiveRange] = useState('Today');
-    const { data: sales = [], isLoading, error } = useSales({ startDate: dateFrom || '', endDate: dateTo || '' });
+    const { data: sales, isLoading, error } = useSales({ startDate: dateFrom || '', endDate: dateTo || '' });
 
     const applyQuickRange = (label: string, getRange: () => { from: Date | null; to: Date | null }) => {
         setActiveRange(label);
@@ -64,7 +64,7 @@ export function SalesList() {
 
     // ── client-side filtering ─────────────────────────────────────────────────
     const filtered = useMemo(() => {
-        return sales.filter((sale: Sale) => {
+        return (sales?.data || [])?.filter((sale: Sale) => {
             const saleDate = new Date(sale.createdAt);
 
             // date from
@@ -97,7 +97,6 @@ export function SalesList() {
     }, [sales, dateFrom, dateTo, paymentMethod, query]);
 
     // ── summary stats ─────────────────────────────────────────────────────────
-    const totalRevenue = filtered.reduce((sum: number, s: Sale) => sum + Number(s.total), 0);
     const totalItems = filtered.reduce((sum: number, s: Sale) => sum + (s.items?.length ?? 0), 0);
 
     const hasActiveFilters =
@@ -218,7 +217,7 @@ export function SalesList() {
             <div className="grid grid-cols-3 gap-4">
                 {[
                     { label: 'Sales', value: filtered.length.toString(), color: 'text-blue-600' },
-                    { label: 'Revenue', value: formatCurrency(totalRevenue), color: 'text-green-600' },
+                    { label: 'Revenue', value: formatCurrency(sales?.totalRevenue || 0), color: 'text-green-600' },
                     { label: 'Items Sold', value: totalItems.toString(), color: 'text-purple-600' },
                 ].map(s => (
                     <div key={s.label} className="bg-white rounded-lg border border-gray-200 shadow p-4">

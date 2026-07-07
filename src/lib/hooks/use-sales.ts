@@ -12,7 +12,7 @@ async function fetchSales(params?: {
   const response = await fetch(`/api/sales?${queryParams}`);
   if (!response.ok) throw new Error('Failed to fetch sales');
   const data = await response.json();
-  return data?.data;
+  return { data: data?.data || [], total: data?.meta?.total, totalRevenue: data?.meta?.totalRevenue };
 }
 
 async function fetchSaleById(id: string) {
@@ -148,7 +148,7 @@ export function useRecentSales(limit: number = 10, refreshKey: number = 0) {
   return useQuery({
     queryKey: ['sales', 'recent', limit, refreshKey],
     queryFn: () => fetchSales(),
-    select: (data) => data.slice(0, limit),
+    select: (data) => data?.data?.slice(0, limit),
     refetchInterval: 30 * 1000, // Refetch every 30 seconds
   });
 }
@@ -174,11 +174,11 @@ export function useSalesSummary(startDate: string, endDate: string) {
       const sales = await fetchSales({ startDate, endDate });
 
       // Calculate summary
-      const totalSales = sales.reduce((sum: number, sale: any) => sum + Number(sale.total), 0);
-      const totalTransactions = sales.length;
+      const totalSales = sales?.data.reduce((sum: number, sale: any) => sum + Number(sale.total), 0);
+      const totalTransactions = sales?.total.length;
       const averageTransaction = totalSales / totalTransactions || 0;
 
-      const paymentBreakdown = sales.reduce((acc: any, sale: any) => {
+      const paymentBreakdown = sales?.data.reduce((acc: any, sale: any) => {
         const method = sale.paymentMethod;
         acc[method] = (acc[method] || 0) + Number(sale.total);
         return acc;

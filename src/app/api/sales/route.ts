@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     const total = subtotal;
 
     // Create sale in transaction
-    const sale = await prisma.$transaction(async (tx) => {
+    const sale = await prisma.$transaction(async (tx: any) => {
       // Create sale
       const newSale = await tx.sale.create({
         data: {
@@ -190,16 +190,35 @@ export async function GET(request: NextRequest) {
 
     console.log('Final WHERE clause:', JSON.stringify(where, null, 2));
 
-    const [sales, total] = await Promise.all([
+    // const [sales, total] = await Promise.all([
+    //   prisma.sale.findMany({
+    //     where,
+    //     include: { items: true, user: true },
+    //     orderBy: { createdAt: 'desc' },
+    //     take,
+    //     skip
+    //   }),
+    //   prisma.sale.count({ where }),
+    // ]);
+    const [sales, total, revenueAgg, itemsAgg] = await Promise.all([
       prisma.sale.findMany({
         where,
         include: { items: true, user: true },
         orderBy: { createdAt: 'desc' },
         take,
-        skip
+        skip,
       }),
       prisma.sale.count({ where }),
+      prisma.sale.aggregate({
+        where,
+        _sum: { total: true },
+      }),
+      prisma.saleItem.aggregate({
+        where: { sale: { ...where } },
+        _sum: { quantity: true },
+      }),
     ]);
+
     console.log(`Fetched ${sales.length} sales, total matching: ${total}`);
     console.log('Applied filters:', {
       hasSearch: !!q,
@@ -207,7 +226,12 @@ export async function GET(request: NextRequest) {
       hasDateRange: !!(startDate || endDate)
     });
 
-    return NextResponse.json({ data: sales, meta: { total } });
+    return NextResponse.json({
+      data: sales, meta: {
+        total, totalRevenue: revenueAgg._sum.total ?? 0,        // sum of all sale amounts
+        totalItemsSold: itemsAgg._sum.quantity ?? 0,
+      }
+    });
   } catch (error) {
     console.error('Get sales error:', error);
     return NextResponse.json({ error: 'Failed to fetch sales' }, { status: 500 });
