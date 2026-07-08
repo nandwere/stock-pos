@@ -139,26 +139,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const { merchantId } = session;
-
     const url = new URL(request.url);
     const q = url.searchParams.get('q')?.trim();
     const page = Number(url.searchParams.get('page') ?? 0);
     const pageSize = Number(url.searchParams.get('pageSize') ?? 20);
     const take = pageSize;
-    const skip = page * pageSize
+    const skip = page * pageSize;
     const paymentMethod = url.searchParams.get('paymentMethod');
     const startDate = url.searchParams.get('startDate');
     const endDate = url.searchParams.get('endDate');
     const productId = url.searchParams.get('productId');
 
-    console.log('Fetching sales with filters:', {
-      q,
-      paymentMethod,
-      startDate,
-      endDate,
-      take,
-      skip
-    });
+    console.log('Fetching sales with filters:', { q, paymentMethod, startDate, endDate, take, skip });
 
     const where: any = { merchantId };
     if (q) {
@@ -168,35 +160,34 @@ export async function GET(request: NextRequest) {
       ];
     }
     if (paymentMethod) where.paymentMethod = paymentMethod;
-
     if (productId) {
-      where.items = {
-        some: { productId },
-      };
+      where.items = { some: { productId } };
     }
-
-    if (startDate || endDate) where.createdAt = {};
-    // Date range filter - IMPORTANT FIX
     if (startDate || endDate) {
       where.createdAt = {};
-
-      // Convert string dates to Date objects in UTC
       if (startDate) {
-        // Parse date and set to start of day in UTC
         const start = new Date(startDate);
         start.setUTCHours(0, 0, 0, 0);
         where.createdAt.gte = start;
         console.log('Start date filter (UTC):', start.toISOString());
       }
-
       if (endDate) {
-        // Parse date and set to end of day in UTC
         const end = new Date(endDate);
         end.setUTCHours(23, 59, 59, 999);
         where.createdAt.lte = end;
         console.log('End date filter (UTC):', end.toISOString());
       }
     }
+
+    // Declared separately as `any` BEFORE Promise.all — this is what avoids the
+    // strict SaleWhereInput inference that was causing the type error when it
+    // was written inline inside the array.
+    const productSaleWhere: any = {
+      merchantId,
+      ...(startDate || endDate ? { createdAt: where.createdAt } : {}),
+      ...(paymentMethod ? { paymentMethod } : {}),
+      ...(q ? { OR: where.OR } : {}),
+    };
 
     const [sales, total, revenueAgg, itemsAgg, productItemAgg] = await Promise.all([
       prisma.sale.findMany({
@@ -215,22 +206,18 @@ export async function GET(request: NextRequest) {
         where: { sale: { ...where } },
         _sum: { quantity: true },
       }),
-      // NEW — only meaningful/used when productId is set
       productId
         ? prisma.saleItem.aggregate({
-          where: {
-            productId,
-            sale: {
-              merchantId,
-              ...(startDate || endDate ? { createdAt: where.createdAt } : {}),
-              ...(paymentMethod ? { paymentMethod } : {}),
-              ...(q ? { OR: where.OR } : {}),
+            where: {
+              productId,
+              sale: productSaleWhere,
             },
-          },
-          _sum: { quantity: true, subtotal: true },
-        })
+            _sum: { quantity: true, subtotal: true },
+          })
         : Promise.resolve(null),
     ]);
+
+    console.log(`Fetched ${sales.length} sales, total matching: ${total}`);
 
     return NextResponse.json({
       data: sales,
@@ -239,8 +226,6 @@ export async function GET(request: NextRequest) {
         page,
         pageSize,
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
-        // When filtering by product, revenue/items should reflect that product's
-        // share only — not the full totals of sales that merely contain it.
         totalRevenue: productId
           ? (productItemAgg?._sum.subtotal ?? 0)
           : (revenueAgg._sum.total ?? 0),
