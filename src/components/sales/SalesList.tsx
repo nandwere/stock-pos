@@ -2,107 +2,87 @@
 
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/stock-calculations';
-import { ShoppingCart, FileText, Search, X, Filter } from 'lucide-react';
+import { ShoppingCart, FileText, Search, X, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSales } from "@/lib/hooks/use-sales";
+import { useProducts } from '@/lib/hooks/use-products'; // adjust path/name to your actual hook
 import { Sale } from '@/types';
 import { useState, useMemo } from 'react';
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── helpers (unchanged) ──────────────────────────────────────────────────────
 const toDateInput = (d: Date) =>
     d.toLocaleDateString().slice(0, 10).split('/').reverse().join('-');
 
-
-const todayStart = () => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-};
-const todayEnd = () => {
-    const d = new Date();
-    d.setHours(23, 59, 59, 999);
-    return d;
-};
+const todayStart = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const todayEnd = () => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; };
 
 const PAYMENT_METHODS = ['All', 'CASH', 'CREDIT', 'MOBILE_MONEY', 'CREDIT_CARD'];
+const PAGE_SIZE = 20;
 
 const QUICK_RANGES = [
     { label: 'Today', getRange: () => ({ from: todayStart(), to: todayEnd() }) },
     { label: 'Yesterday', getRange: () => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(0, 0, 0, 0); const e = new Date(d); e.setHours(23, 59, 59, 999); return { from: d, to: e }; } },
-    {
-        label: 'This Week', getRange: () => {
-            const from = new Date();
-            from.setDate(from.getDate() - 6);
-            from.setHours(0, 0, 0, 0);
-            return { from, to: todayEnd() };
-        },
-    },
+    { label: 'This Week', getRange: () => { const from = new Date(); from.setDate(from.getDate() - 6); from.setHours(0, 0, 0, 0); return { from, to: todayEnd() }; } },
     { label: 'This Month', getRange: () => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return { from: d, to: todayEnd() }; } },
     { label: 'All Time', getRange: () => ({ from: null, to: null }) },
 ];
 
 export function SalesList() {
-    // ── filter state (default: today) ────────────────────────────────────────
     const [query, setQuery] = useState('');
     const [dateFrom, setDateFrom] = useState<string>(toDateInput(todayStart()));
     const [dateTo, setDateTo] = useState<string>(toDateInput(todayEnd()));
     const [paymentMethod, setPaymentMethod] = useState('All');
+    const [productId, setProductId] = useState('All');   // NEW
     const [activeRange, setActiveRange] = useState('Today');
-    const { data: sales, isLoading, error } = useSales({ startDate: dateFrom || '', endDate: dateTo || '' });
+    const [page, setPage] = useState(0);                 // NEW — server-side page index
+
+    const { data: productsData } = useProducts();     // NEW
+
+    console.log(productsData);
+    const products = productsData ?? [];
+
+    const { data: sales, isLoading, error } = useSales({
+        startDate: dateFrom || '',
+        endDate: dateTo || '',
+        paymentMethod: paymentMethod !== 'All' ? paymentMethod : undefined,
+        productId: productId !== 'All' ? productId : undefined,
+        q: query.trim() || undefined,
+        page,
+        pageSize: PAGE_SIZE,
+    });
 
     const applyQuickRange = (label: string, getRange: () => { from: Date | null; to: Date | null }) => {
         setActiveRange(label);
         const { from, to } = getRange();
         setDateFrom(from ? toDateInput(from) : '');
         setDateTo(to ? toDateInput(to) : '');
+        setPage(0); // reset to first page whenever filters change
     };
 
     const clearFilters = () => {
         setQuery('');
         setPaymentMethod('All');
+        setProductId('All');
+        setPage(0);
         applyQuickRange('Today', QUICK_RANGES[0].getRange);
     };
 
-    // ── client-side filtering ─────────────────────────────────────────────────
-    const filtered = useMemo(() => {
-        return (sales?.data || [])?.filter((sale: Sale) => {
-            const saleDate = new Date(sale.createdAt);
-
-            // date from
-            if (dateFrom) {
-                const from = new Date(dateFrom);
-                from.setHours(0, 0, 0, 0);
-                if (saleDate < from) return false;
-            }
-            // date to
-            if (dateTo) {
-                const to = new Date(dateTo);
-                to.setHours(23, 59, 59, 999);
-                if (saleDate > to) return false;
-            }
-            // payment method
-            if (paymentMethod !== 'All' && sale.paymentMethod !== paymentMethod) return false;
-
-            // text search
-            const q = query.toLowerCase().trim();
-            if (q) {
-                const haystack = [
-                    sale.saleNumber,
-                    sale.customerName ?? '',
-                    sale.user?.name ?? '',
-                ].join(' ').toLowerCase();
-                if (!haystack.includes(q)) return false;
-            }
-            return true;
-        });
-    }, [sales, dateFrom, dateTo, paymentMethod, query]);
-
-    // ── summary stats ─────────────────────────────────────────────────────────
+    // Server now handles filtering (date/payment/product/search) and pagination —
+    // `sales.data` is already the correct page of results.
+    const filtered: Sale[] = sales?.data ?? [];
     const totalItems = filtered.reduce((sum: number, s: Sale) => sum + (s.items?.length ?? 0), 0);
+    const totalPages = sales?.totalPages ?? 1;
+    const totalResults = sales?.total ?? 0;
 
     const hasActiveFilters =
         activeRange !== 'Today' ||
         paymentMethod !== 'All' ||
+        productId !== 'All' ||
         query.trim() !== '';
+
+    const goToPage = (p: number) => {
+        if (p < 0 || p >= totalPages) return;
+        setPage(p);
+    };
 
     return (
         <div className="space-y-5 text-gray-500">
@@ -150,36 +130,33 @@ export function SalesList() {
                     ))}
                 </div>
 
-                {/* Row 2: custom date + payment + search */}
+                {/* Row 2: custom date + payment + product + search */}
                 <div className="flex flex-wrap gap-3 items-end">
-                    {/* Custom date from */}
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-gray-500 font-medium">From</label>
                         <input
                             type="date"
                             value={dateFrom}
-                            onChange={e => { setDateFrom(e.target.value); setActiveRange('Custom'); }}
+                            onChange={e => { setDateFrom(e.target.value); setActiveRange('Custom'); setPage(0); }}
                             className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
 
-                    {/* Custom date to */}
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-gray-500 font-medium">To</label>
                         <input
                             type="date"
                             value={dateTo}
-                            onChange={e => { setDateTo(e.target.value); setActiveRange('Custom'); }}
+                            onChange={e => { setDateTo(e.target.value); setActiveRange('Custom'); setPage(0); }}
                             className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
 
-                    {/* Payment method */}
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-gray-500 font-medium">Payment Method</label>
                         <select
                             value={paymentMethod}
-                            onChange={e => setPaymentMethod(e.target.value)}
+                            onChange={e => { setPaymentMethod(e.target.value); setPage(0); }}
                             className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             {PAYMENT_METHODS.map(m => (
@@ -188,7 +165,21 @@ export function SalesList() {
                         </select>
                     </div>
 
-                    {/* Search */}
+                    {/* Product filter — NEW */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-gray-500 font-medium">Inventory Item</label>
+                        <select
+                            value={productId}
+                            onChange={e => { setProductId(e.target.value); setPage(0); }}
+                            className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
+                        >
+                            <option value="All">All items</option>
+                            {products.map((p: any) => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
                     <div className="flex flex-col gap-1 flex-1 min-w-[180px]">
                         <label className="text-xs text-gray-500 font-medium">Search</label>
                         <div className="relative">
@@ -196,13 +187,13 @@ export function SalesList() {
                             <input
                                 type="text"
                                 value={query}
-                                onChange={e => setQuery(e.target.value)}
+                                onChange={e => { setQuery(e.target.value); setPage(0); }}
                                 placeholder="Sale # or customer name"
                                 className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             {query && (
                                 <button
-                                    onClick={() => setQuery('')}
+                                    onClick={() => { setQuery(''); setPage(0); }}
                                     className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                                 >
                                     <X className="w-3.5 h-3.5" />
@@ -216,9 +207,9 @@ export function SalesList() {
             {/* ── Summary stats ── */}
             <div className="grid grid-cols-3 gap-4">
                 {[
-                    { label: 'Sales', value: filtered.length.toString(), color: 'text-blue-600' },
+                    { label: 'Sales', value: totalResults.toString(), color: 'text-blue-600' },
                     { label: 'Revenue', value: formatCurrency(sales?.totalRevenue || 0), color: 'text-green-600' },
-                    { label: 'Items Sold', value: totalItems.toString(), color: 'text-purple-600' },
+                    { label: 'Items Sold', value: (sales?.totalItemsSold ?? totalItems).toString(), color: 'text-purple-600' },
                 ].map(s => (
                     <div key={s.label} className="bg-white rounded-lg border border-gray-200 shadow p-4">
                         <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
@@ -231,7 +222,7 @@ export function SalesList() {
             <div className="bg-white rounded-lg shadow border border-gray-200">
                 <div className="p-4 border-b flex items-center justify-between">
                     <h2 className="text-sm font-semibold text-gray-900">
-                        {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+                        {totalResults} result{totalResults !== 1 ? 's' : ''}
                         {activeRange !== 'All Time' ? ` · ${activeRange}` : ''}
                     </h2>
                 </div>
@@ -307,6 +298,54 @@ export function SalesList() {
                                         Clear filters
                                     </button>
                                 )}
+                            </div>
+                        )}
+
+                        {/* ── Pagination controls — NEW ── */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between p-4 border-t">
+                                <span className="text-xs text-gray-500">
+                                    Page {page + 1} of {totalPages}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => goToPage(page - 1)}
+                                        disabled={page === 0}
+                                        className="p-1.5 rounded-md border border-gray-300 text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    {Array.from({ length: totalPages }, (_, i) => i)
+                                        .filter(i => i === 0 || i === totalPages - 1 || Math.abs(i - page) <= 1)
+                                        .reduce<number[]>((acc, i) => {
+                                            if (acc.length > 0 && i - acc[acc.length - 1] > 1) acc.push(-1); // gap marker
+                                            acc.push(i);
+                                            return acc;
+                                        }, [])
+                                        .map((i, idx) =>
+                                            i === -1 ? (
+                                                <span key={`gap-${idx}`} className="px-1 text-gray-400">…</span>
+                                            ) : (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => goToPage(i)}
+                                                    className={`w-8 h-8 rounded-md text-xs font-medium ${i === page
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'text-gray-600 border border-gray-300 hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    {i + 1}
+                                                </button>
+                                            )
+                                        )}
+                                    <button
+                                        onClick={() => goToPage(page + 1)}
+                                        disabled={page >= totalPages - 1}
+                                        className="p-1.5 rounded-md border border-gray-300 text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+                                    >
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>

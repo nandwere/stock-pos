@@ -7,12 +7,32 @@ async function fetchSales(params?: {
   startDate?: string;
   endDate?: string;
   userId?: string;
+  productId?: string;   // NEW
+  paymentMethod?: string;
+  q?: string;
+  page?: number;        // NEW
+  pageSize?: number;    // NEW
 }) {
-  const queryParams = new URLSearchParams(params as any);
+  const cleanParams: Record<string, string> = {};
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      cleanParams[key] = String(value);
+    }
+  });
+
+  const queryParams = new URLSearchParams(cleanParams);
   const response = await fetch(`/api/sales?${queryParams}`);
   if (!response.ok) throw new Error('Failed to fetch sales');
   const data = await response.json();
-  return { data: data?.data || [], total: data?.meta?.total, totalRevenue: data?.meta?.totalRevenue };
+  return {
+    data: data?.data || [],
+    total: data?.meta?.total ?? 0,
+    page: data?.meta?.page ?? 0,
+    pageSize: data?.meta?.pageSize ?? 20,
+    totalPages: data?.meta?.totalPages ?? 1,
+    totalRevenue: data?.meta?.totalRevenue ?? 0,
+    totalItemsSold: data?.meta?.totalItemsSold ?? 0,
+  };
 }
 
 async function fetchSaleById(id: string) {
@@ -64,6 +84,11 @@ export function useSales(params?: {
   startDate?: string;
   endDate?: string;
   userId?: string;
+  productId?: string;
+  paymentMethod?: string;
+  q?: string;
+  page?: number;
+  pageSize?: number;
 }) {
   return useQuery({
     queryKey: ['sales', params],
