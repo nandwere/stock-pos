@@ -35,7 +35,6 @@ export function POSInterface() {
   const getCartTotal = usePOSStore(state => state.getCartTotal);
 
   // React Query
-  // const { data: products = [], isLoading, error } = useProducts() as { data: Product[], isLoading: boolean, error: any };
     const { data: products = [], isLoading, error } = useProducts({
     q: searchQuery.trim() || undefined,
   }) as { data: Product[]; isLoading: boolean; error: any };
@@ -134,7 +133,7 @@ export function POSInterface() {
               <p className="text-gray-500">No products found</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {products.map((product: any) => (
                 <ProductCard
                   key={product.id}
