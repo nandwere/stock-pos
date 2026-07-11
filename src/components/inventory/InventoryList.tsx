@@ -43,7 +43,7 @@ export function InventoryList() {
   if (error) return <div>Error: {error.message}</div>;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-1 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -70,7 +70,7 @@ export function InventoryList() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="flex items-center gap-3 mb-2">
             <Package className="w-5 h-5 text-blue-600" />
