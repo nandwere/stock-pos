@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "SaleItem" ADD COLUMN     "costPrice" DECIMAL(10,3) NOT NULL DEFAULT 0,
+ADD COLUMN     "discount" DECIMAL(10,3) NOT NULL DEFAULT 0;

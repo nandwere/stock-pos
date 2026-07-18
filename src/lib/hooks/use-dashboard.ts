@@ -13,6 +13,9 @@ interface DashboardStats {
   yesterdaySales?: number;
   weekSales?: number;
   monthSales?: number;
+  stockProfit?: number;
+  profitChange?: number;
+  todayProfit?: number;
 }
 
 /**

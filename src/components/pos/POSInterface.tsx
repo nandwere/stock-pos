@@ -61,7 +61,7 @@ export function POSInterface() {
         items: cart.map(item => ({
           productId: item.productId,
           quantity: item.quantity,
-          unitPrice: item.unitPrice,
+          unitPrice: Number(item.unitPrice),
         })),
         paymentMethod: paymentData.paymentMethod,
         customerName: paymentData.customerName,
