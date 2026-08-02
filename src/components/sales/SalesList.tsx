@@ -37,7 +37,6 @@ export function SalesList() {
 
     const { data: productsData } = useProducts();     // NEW
 
-    console.log(productsData);
     const products = productsData ?? [];
 
     const { data: sales, isLoading, error } = useSales({

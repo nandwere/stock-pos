@@ -19,6 +19,7 @@ import { useDashboardStats } from '@/lib/hooks/use-dashboard';
 import { useRecentSales } from '@/lib/hooks/use-sales';
 import { useLowStockProducts } from '@/lib/hooks/use-products';
 import Link from 'next/link';
+import { SalesChart } from './SalesChart';
 
 // Shared change-indicator, extracted since it's now used by both the sales
 // card and the new profit card instead of being duplicated inline.
@@ -318,99 +319,4 @@ function LowStockAlert({ items, isLoading }: { items: any[], isLoading: boolean 
       )}
     </div>
   );
-}
-
-// Sales Chart Component
-function SalesChart() {
-  const [timeRange, setTimeRange] = useState('7');
-  const { data: chartData, isLoading } = useSalesChartData(timeRange);
-
-  return (
-    <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Sales Overview</h2>
-        <select
-          className="px-3 py-1 border border-gray-300 rounded text-sm"
-          value={timeRange}
-          onChange={(e) => setTimeRange(e.target.value)}
-        >
-          <option value="7">Last 7 days</option>
-          <option value="30">Last 30 days</option>
-          <option value="90">Last 3 months</option>
-        </select>
-      </div>
-
-      {isLoading ? (
-        <div className="h-64 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-        </div>
-      ) : chartData && chartData.length > 0 ? (
-        <div className="h-64">
-          {/* TODO: Add chart library like recharts */}
-          <SimpleSalesChart data={chartData} />
-        </div>
-      ) : (
-        <div className="h-64 flex items-center justify-center text-gray-400">
-          <div className="text-center">
-            <Calendar className="w-12 h-12 mx-auto mb-2" />
-            <p>No sales data available for this period</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Simple Sales Chart (placeholder - replace with recharts)
-function SimpleSalesChart({ data }: { data: any[] }) {
-  const maxValue = Math.max(...data.map(d => d.amount));
-
-  return (
-    <div className="h-full flex items-end gap-2 px-4">
-      {data.map((item, index) => {
-        const height = (item.amount / maxValue) * 100;
-
-        return (
-          <div key={index} className="flex-1 flex flex-col items-center">
-            <div
-              className="w-full bg-blue-500 rounded-t hover:bg-blue-600 transition-colors cursor-pointer"
-              style={{ height: `${height}%` }}
-              title={`${item.date}: ${formatCurrency(item.amount)}`}
-            />
-            <div className="text-xs text-gray-500 mt-2">
-              {new Date(item.date).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric'
-              })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// Hook for sales chart data
-function useSalesChartData(days: string) {
-  const [data, setData] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchChartData() {
-      try {
-        setIsLoading(true);
-        const response = await fetch(`/api/sales/chart?days=${days}`);
-        const result = await response.json();
-        setData(result);
-      } catch (error) {
-        console.error('Error fetching chart data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchChartData();
-  }, [days]);
-
-  return { data, isLoading };
 }
