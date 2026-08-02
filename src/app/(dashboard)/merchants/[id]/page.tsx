@@ -89,6 +89,12 @@ export default function MerchantEditPage() {
     setSaved(false);
   };
 
+
+  const setChecked = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((f) => ({ ...f, [k]: e.target.checked }));
+    setSaved(false);
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -234,21 +240,6 @@ export default function MerchantEditPage() {
             <input value={form.currency} onChange={set('currency')} className={inputCls} />
           </Field>
 
-          <Field label="Delivery fee" hint="applied to all orders in the storefront">
-            <input value={form.deliveryFee} onChange={set('deliveryFee')} className={inputCls} />
-          </Field>
-
-          <Field label="Storefront enabled" hint="appears on the storefront">
-            <input type="checkbox" checked={form.storefrontEnabled} onChange={set('storefrontEnabled')} className={inputCls} />
-          </Field>
-
-
-          <div className="col-span-2">
-            <Field label="Storefront tagline" hint="appears on the storefront">
-              <input value={form.storefrontTagline} onChange={set('storefrontTagline')} className={inputCls} />
-            </Field>
-          </div>
-
           <div className="col-span-2">
             <Field label="Address">
               <input value={form.address} onChange={set('address')} className={inputCls} />
@@ -275,6 +266,42 @@ export default function MerchantEditPage() {
             Trial ends {new Date(merchant.trialEndsAt).toLocaleDateString()}
           </p>
         )}
+
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-2">
+          Storefront
+        </p>
+
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input
+            type="checkbox"
+            checked={form.storefrontEnabled}
+            onChange={setChecked('storefrontEnabled')}
+            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          Public storefront enabled
+          <span className="text-xs text-gray-400 font-normal">
+            — /store/{form.slug || merchant.slug}
+          </span>
+        </label>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Delivery fee">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.deliveryFee}
+              onChange={set('deliveryFee')}
+              className={inputCls}
+            />
+          </Field>
+
+          <div>
+            <Field label="Storefront tagline">
+              <input value={form.storefrontTagline} onChange={set('storefrontTagline')} className={inputCls} />
+            </Field>
+          </div>
+        </div>
 
         <div className="flex justify-end pt-2">
           <button
