@@ -15,6 +15,9 @@ async function main() {
       timezone: 'Africa/Nairobi',
       plan: 'STARTER',
       isActive: true,
+      storefrontEnabled: true,
+      storefrontTagline: 'Your one-stop shop for quality products!',
+      deliveryFee: 50,
     },
   });
   console.log(`✔ Merchant: ${baraka.name} (${baraka.id})`);

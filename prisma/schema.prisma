@@ -50,36 +50,40 @@ enum MerchantPlan {
 // ─────────────────────────────────────────────
 
 model Merchant {
-  id           String       @id @default(cuid())
-  name         String
-  slug         String       @unique   // e.g. "acme-shop" → acme-shop.yourapp.com
-  email        String       @unique   // billing / contact email
-  phone        String?
-  address      String?
-  logoUrl      String?
-  currency     String       @default("KES")
-  timezone     String       @default("Africa/Nairobi")
-  plan         MerchantPlan @default(FREE)
-  isActive     Boolean      @default(true)
-  trialEndsAt  DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique // e.g. "acme-shop" → acme-shop.yourapp.com
+  email       String       @unique // billing / contact email
+  phone       String?
+  address     String?
+  logoUrl     String?
+  currency    String       @default("KES")
+  timezone    String       @default("Africa/Nairobi")
+  plan        MerchantPlan @default(FREE)
+  isActive    Boolean      @default(true)
+  storefrontEnabled  Boolean  @default(false)
+  storefrontTagline String?
+  deliveryFee    Decimal @default(0)  @db.Decimal(10, 3)
+  trialEndsAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   // Relations
-  users        User[]
-  categories   Category[]
-  products     Product[]
-  sales        Sale[]
-  stockCounts  StockCount[]
-  adjustments  StockAdjustment[]
-  dailySummaries DailySummary[]
-  shifts       Shift[]
-  settings     Settings[]
-  otpCodes   OtpCode[]
-  paymentRequests PaymentRequest[]
-  suppliers        Supplier[]
-  expenses         Expense[]
+  users             User[]
+  categories        Category[]
+  products          Product[]
+  sales             Sale[]
+  stockCounts       StockCount[]
+  adjustments       StockAdjustment[]
+  dailySummaries    DailySummary[]
+  shifts            Shift[]
+  settings          Settings[]
+  otpCodes          OtpCode[]
+  paymentRequests   PaymentRequest[]
+  suppliers         Supplier[]
+  expenses          Expense[]
   expenseCategories ExpenseCategory[]
+  orders            Order[]
 
   @@index([slug])
   @@index([email])
@@ -87,24 +91,24 @@ model Merchant {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  merchantId    String
-  email         String   @unique
-  name          String
-  role          UserRole @default(CASHIER)
-  password      String
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  merchant      Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  sales         Sale[]
-  stockCounts   StockCount[]
-  adjustments   StockAdjustment[]
-  shifts        Shift[]
+  id         String   @id @default(cuid())
+  merchantId String
+  email      String   @unique
+  name       String
+  role       UserRole @default(CASHIER)
+  password   String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  merchant         Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  sales            Sale[]
+  stockCounts      StockCount[]
+  adjustments      StockAdjustment[]
+  shifts           Shift[]
   expenses         Expense[]
   expenseApprovals ExpenseApproval[]
-  
+
   // Email unique per merchant, not globally
   @@unique([merchantId, email])
   @@index([merchantId])
@@ -113,47 +117,47 @@ model User {
 }
 
 model Category {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   merchantId  String
-  name        String    @unique
+  name        String   @unique
   description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  merchant    Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  products    Product[]
-  
+  merchant Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  products Product[]
+
   @@unique([merchantId, name])
   @@index([merchantId])
 }
 
 model Product {
-  id              String   @id @default(cuid())
-  merchantId      String
-  name            String
-  description     String?
-  sku             String   @unique
-  barcode         String?  @unique
-  categoryId      String
-  costPrice       Decimal  @db.Decimal(10, 3)
-  sellingPrice    Decimal  @db.Decimal(10, 3)
-  currentStock  Decimal  @default(0)
-  reorderLevel  Decimal  @default(0) 
-  unit            String
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  merchant        Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  category        Category @relation(fields: [categoryId], references: [id])
-  saleItems       SaleItem[]
-  stockCounts     StockCount[]
-  adjustments     StockAdjustment[]
+  id           String   @id @default(cuid())
+  merchantId   String
+  name         String
+  description  String?
+  sku          String   @unique
+  barcode      String?  @unique
+  categoryId   String
+  costPrice    Decimal  @db.Decimal(10, 3)
+  sellingPrice Decimal  @db.Decimal(10, 3)
+  currentStock Decimal  @default(0)
+  reorderLevel Decimal  @default(0)
+  unit         String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  merchant    Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  category    Category          @relation(fields: [categoryId], references: [id])
+  saleItems   SaleItem[]
+  stockCounts StockCount[]
+  adjustments StockAdjustment[]
   // In Product model — add relation:
-  supplierId       String?
-  supplier         Supplier? @relation(fields: [supplierId], references: [id])
-  
+  supplierId  String?
+  supplier    Supplier?         @relation(fields: [supplierId], references: [id])
+  orderItems  OrderItem[]
+
   // SKU and barcode unique per merchant
   @@unique([merchantId, sku])
   @@unique([merchantId, barcode])
@@ -163,25 +167,25 @@ model Product {
 }
 
 model Sale {
-  id              String        @id @default(cuid())
-  merchantId      String
-  saleNumber      String        @unique
-  userId          String
-  customerName    String?
-  paymentMethod   PaymentMethod
-  subtotal        Decimal       @db.Decimal(10, 3)
-  tax             Decimal       @db.Decimal(10, 3) @default(0)
-  discount        Decimal       @db.Decimal(10, 3) @default(0)
-  total           Decimal       @db.Decimal(10, 3)
-  amountPaid      Decimal       @db.Decimal(10, 3)
-  change          Decimal       @db.Decimal(10, 3) @default(0)
-  notes           String?
-  createdAt       DateTime      @default(now())
-  
-  merchant      Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  user            User          @relation(fields: [userId], references: [id])
-  items           SaleItem[]
-  
+  id            String        @id @default(cuid())
+  merchantId    String
+  saleNumber    String        @unique
+  userId        String
+  customerName  String?
+  paymentMethod PaymentMethod
+  subtotal      Decimal       @db.Decimal(10, 3)
+  tax           Decimal       @default(0) @db.Decimal(10, 3)
+  discount      Decimal       @default(0) @db.Decimal(10, 3)
+  total         Decimal       @db.Decimal(10, 3)
+  amountPaid    Decimal       @db.Decimal(10, 3)
+  change        Decimal       @default(0) @db.Decimal(10, 3)
+  notes         String?
+  createdAt     DateTime      @default(now())
+
+  merchant Merchant   @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  user     User       @relation(fields: [userId], references: [id])
+  items    SaleItem[]
+
   // Sale number unique per merchant
   @@unique([merchantId, saleNumber])
   @@index([merchantId])
@@ -191,57 +195,57 @@ model Sale {
 }
 
 model SaleItem {
-  id              String   @id @default(cuid())
-  saleId          String
-  productId       String
-  quantity        Decimal  @db.Decimal(10, 3)
-  unitPrice       Decimal  @db.Decimal(10, 3)
-  costPrice       Decimal  @db.Decimal(10, 3) @default(0)
-  discount        Decimal  @db.Decimal(10, 3) @default(0)
-  subtotal        Decimal  @db.Decimal(10, 3)     
-  
-  sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product         Product  @relation(fields: [productId], references: [id])
-  
+  id        String  @id @default(cuid())
+  saleId    String
+  productId String
+  quantity  Decimal @db.Decimal(10, 3)
+  unitPrice Decimal @db.Decimal(10, 3)
+  costPrice Decimal @default(0) @db.Decimal(10, 3)
+  discount  Decimal @default(0) @db.Decimal(10, 3)
+  subtotal  Decimal @db.Decimal(10, 3)
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
   @@index([saleId])
   @@index([productId])
 }
 
 model StockCount {
-  id              String   @id @default(cuid())
-  merchantId      String
-  productId       String
-  userId          String
-  expectedQty     Decimal  @db.Decimal(10, 3)
-  actualQty       Decimal  @db.Decimal(10, 3)
-  variance        Decimal  @db.Decimal(10, 3)
-  notes           String?
-  countDate       DateTime @default(now())
-  
-  merchant        Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  product         Product  @relation(fields: [productId], references: [id])
-  user            User     @relation(fields: [userId], references: [id])
-  
+  id          String   @id @default(cuid())
+  merchantId  String
+  productId   String
+  userId      String
+  expectedQty Decimal  @db.Decimal(10, 3)
+  actualQty   Decimal  @db.Decimal(10, 3)
+  variance    Decimal  @db.Decimal(10, 3)
+  notes       String?
+  countDate   DateTime @default(now())
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
   @@index([merchantId])
   @@index([merchantId, productId])
   @@index([merchantId, countDate])
 }
 
 model StockAdjustment {
-  id              String          @id @default(cuid())
-  merchantId      String
-  productId       String
-  userId          String
-  type            TransactionType
-  quantity        Decimal  @db.Decimal(10, 3)
-  reason          String
-  notes           String?
-  createdAt       DateTime        @default(now())
-  
-  merchant        Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  product         Product         @relation(fields: [productId], references: [id])
-  user            User            @relation(fields: [userId], references: [id])
-  
+  id         String          @id @default(cuid())
+  merchantId String
+  productId  String
+  userId     String
+  type       TransactionType
+  quantity   Decimal         @db.Decimal(10, 3)
+  reason     String
+  notes      String?
+  createdAt  DateTime        @default(now())
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
   @@index([merchantId])
   @@index([merchantId, productId])
   @@index([merchantId, createdAt])
@@ -249,22 +253,22 @@ model StockAdjustment {
 }
 
 model DailySummary {
-  id                  String   @id @default(cuid())
-  merchantId          String
-  date                DateTime @unique @db.Date
-  totalSales          Decimal  @db.Decimal(10, 3)
-  totalCost           Decimal  @db.Decimal(10, 3)
-  grossProfit         Decimal  @db.Decimal(10, 3)
-  recordedSales       Decimal  @db.Decimal(10, 3)
-  estimatedSales      Decimal  @db.Decimal(10, 3)
-  cashSales           Decimal  @db.Decimal(10, 3)
-  cardSales           Decimal  @db.Decimal(10, 3)
-  mobilePayments      Decimal  @db.Decimal(10, 3)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id             String   @id @default(cuid())
+  merchantId     String
+  date           DateTime @unique @db.Date
+  totalSales     Decimal  @db.Decimal(10, 3)
+  totalCost      Decimal  @db.Decimal(10, 3)
+  grossProfit    Decimal  @db.Decimal(10, 3)
+  recordedSales  Decimal  @db.Decimal(10, 3)
+  estimatedSales Decimal  @db.Decimal(10, 3)
+  cashSales      Decimal  @db.Decimal(10, 3)
+  cardSales      Decimal  @db.Decimal(10, 3)
+  mobilePayments Decimal  @db.Decimal(10, 3)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  merchant            Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
   // One summary per merchant per day
   @@unique([merchantId, date])
   @@index([merchantId])
@@ -272,50 +276,50 @@ model DailySummary {
 }
 
 model Shift {
-  id              String   @id @default(cuid())
-  merchantId      String
-  userId          String
-  startTime       DateTime
-  endTime         DateTime?
-  openingCash     Decimal  @db.Decimal(10, 3)
-  closingCash     Decimal? @db.Decimal(10, 3)
-  expectedCash    Decimal? @db.Decimal(10, 3)
-  variance        Decimal? @db.Decimal(10, 3)
-  notes           String?
-  
-  merchant        Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  user            User     @relation(fields: [userId], references: [id])
-  
+  id           String    @id @default(cuid())
+  merchantId   String
+  userId       String
+  startTime    DateTime
+  endTime      DateTime?
+  openingCash  Decimal   @db.Decimal(10, 3)
+  closingCash  Decimal?  @db.Decimal(10, 3)
+  expectedCash Decimal?  @db.Decimal(10, 3)
+  variance     Decimal?  @db.Decimal(10, 3)
+  notes        String?
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id])
+
   @@index([merchantId])
   @@index([merchantId, userId])
   @@index([merchantId, startTime])
 }
 
 model Settings {
-  id              String   @id @default(cuid())
-  merchantId      String
-  key             String   @unique
-  value           String
-  description     String?
-  updatedAt       DateTime @updatedAt
+  id          String   @id @default(cuid())
+  merchantId  String
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
 
-  merchant        Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
   // Key unique per merchant
   @@unique([merchantId, key])
   @@index([merchantId])
 }
 
 model OtpCode {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   merchantId String
   email      String
   code       String
   expiresAt  DateTime
   usedAt     DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
-  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@index([email, merchantId])
   @@index([code])
@@ -331,19 +335,18 @@ model PaymentRequest {
   id              String        @id @default(cuid())
   merchantId      String
   plan            MerchantPlan
-  transactionCode String        @unique   // prevents double-submissions
+  transactionCode String        @unique // prevents double-submissions
   status          PaymentStatus @default(PENDING)
-  notes           String?                 // admin can leave a rejection reason
+  notes           String? // admin can leave a rejection reason
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  merchant        Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@index([merchantId])
   @@index([status])
   @@index([createdAt])
 }
-
 
 // ── Suppliers ────────────────────────────────────────────────────────────────
 
@@ -361,9 +364,9 @@ model Supplier {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  merchant    Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  expenses    Expense[]
-  products    Product[] // supplier can be linked to products
+  merchant Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  expenses Expense[]
+  products Product[] // supplier can be linked to products
 
   @@unique([merchantId, name])
   @@index([merchantId])
@@ -381,8 +384,8 @@ model ExpenseCategory {
   isSystem    Boolean  @default(false)
   createdAt   DateTime @default(now())
 
-  merchant    Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  expenses    Expense[]
+  merchant Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  expenses Expense[]
 
   @@unique([merchantId, name])
   @@index([merchantId])
@@ -407,19 +410,19 @@ enum ExpenseType {
 }
 
 model Expense {
-  id               String        @id @default(cuid())
+  id               String         @id @default(cuid())
   merchantId       String
   userId           String
   supplierId       String?
   categoryId       String?
   expenseNumber    String
-  type             ExpenseType   @default(OPERATIONAL)
-  status           ExpenseStatus @default(DRAFT)
+  type             ExpenseType    @default(OPERATIONAL)
+  status           ExpenseStatus  @default(DRAFT)
   description      String
-  amount           Decimal       @db.Decimal(10, 3)
-  tax              Decimal       @db.Decimal(10, 3) @default(0)
-  total            Decimal       @db.Decimal(10, 3)
-  currency         String        @default("KES")
+  amount           Decimal        @db.Decimal(10, 3)
+  tax              Decimal        @default(0) @db.Decimal(10, 3)
+  total            Decimal        @db.Decimal(10, 3)
+  currency         String         @default("KES")
   expenseDate      DateTime
   dueDate          DateTime?
   paidAt           DateTime?
@@ -427,18 +430,18 @@ model Expense {
   paymentReference String?
   receiptUrl       String?
   notes            String?
-  isRecurring      Boolean       @default(false)
-  recurringDay     Int?          // day of month for recurring
+  isRecurring      Boolean        @default(false)
+  recurringDay     Int? // day of month for recurring
   tags             String[]
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
-  merchant         Merchant         @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  user             User             @relation(fields: [userId], references: [id])
-  supplier         Supplier?        @relation(fields: [supplierId], references: [id])
-  category         ExpenseCategory? @relation(fields: [categoryId], references: [id])
-  approvals        ExpenseApproval[]
-  items            ExpenseItem[]
+  merchant  Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id])
+  supplier  Supplier?         @relation(fields: [supplierId], references: [id])
+  category  ExpenseCategory?  @relation(fields: [categoryId], references: [id])
+  approvals ExpenseApproval[]
+  items     ExpenseItem[]
 
   @@unique([merchantId, expenseNumber])
   @@index([merchantId])
@@ -450,30 +453,131 @@ model Expense {
 }
 
 model ExpenseItem {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   expenseId   String
   description String
-  quantity    Decimal  @db.Decimal(10, 3)
-  unitPrice   Decimal  @db.Decimal(10, 3)
-  subtotal    Decimal  @db.Decimal(10, 3)
+  quantity    Decimal @db.Decimal(10, 3)
+  unitPrice   Decimal @db.Decimal(10, 3)
+  subtotal    Decimal @db.Decimal(10, 3)
 
-  expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
 
   @@index([expenseId])
 }
 
 model ExpenseApproval {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   expenseId  String
   approverId String
-  status     String   // APPROVED | REJECTED
+  status     String // APPROVED | REJECTED
   comment    String?
   decidedAt  DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
-  expense    Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
-  approver   User     @relation(fields: [approverId], references: [id])
+  expense  Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  approver User    @relation(fields: [approverId], references: [id])
 
   @@index([expenseId])
   @@index([approverId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCHEMA ADDITIONS — public storefront + pay-on-delivery orders
+//
+// This is a PATCH, not a replacement file. Add:
+//   1. The new OrderStatus enum, anywhere with your other enums.
+//   2. The two new fields + one new relation line inside your existing
+//      `model Merchant { ... }` block (marked below).
+//   3. One new relation line inside your existing `model Product { ... }`
+//      block (marked below).
+//   4. The two new models (Order, OrderItem) anywhere in the file.
+//
+// Then run: npx prisma migrate dev --name add_storefront_orders
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum OrderStatus {
+  PENDING // just placed, awaiting merchant confirmation
+  CONFIRMED // merchant has accepted it, preparing for delivery
+  OUT_FOR_DELIVERY
+  DELIVERED // triggers Sale conversion — see OrderItem notes below
+  CANCELLED
+}
+
+// ─────────────────────────────────────────────
+// Add to your EXISTING `model Merchant { ... }` block:
+// ─────────────────────────────────────────────
+//   storefrontEnabled Boolean @default(false)
+//   deliveryFee       Decimal @db.Decimal(10, 3) @default(0)
+//   storefrontTagline String?
+//
+// ...and add this line alongside your other relation arrays (sales, products, etc.):
+//   orders            Order[]
+
+// ─────────────────────────────────────────────
+// Add to your EXISTING `model Product { ... }` block, alongside saleItems etc:
+// ─────────────────────────────────────────────
+//   orderItems        OrderItem[]
+
+// ─────────────────────────────────────────────
+// New models
+// ─────────────────────────────────────────────
+
+model Order {
+  id          String @id @default(cuid())
+  merchantId  String
+  orderNumber String @unique
+
+  customerName    String
+  customerPhone   String
+  deliveryAddress String
+  deliveryNotes   String?
+
+  status OrderStatus @default(PENDING)
+
+  subtotal    Decimal @db.Decimal(10, 3)
+  deliveryFee Decimal @default(0) @db.Decimal(10, 3)
+  total       Decimal @db.Decimal(10, 3)
+
+  // Set once a staff member marks the order DELIVERED — how the customer
+  // actually paid the driver/rider at the door. Nullable until then.
+  paymentMethod PaymentMethod?
+
+  // Soft link to the Sale created on delivery (see stock.ts) — kept as a
+  // plain scalar rather than a formal Prisma relation so this patch doesn't
+  // need to touch your existing Sale model. Add a real @relation later if
+  // you want type-safe joins.
+  saleId String? @unique
+
+  confirmedAt      DateTime?
+  outForDeliveryAt DateTime?
+  deliveredAt      DateTime?
+  cancelledAt      DateTime?
+  cancelReason     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  merchant Merchant    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  items    OrderItem[]
+
+  @@unique([merchantId, orderNumber])
+  @@index([merchantId])
+  @@index([merchantId, status])
+  @@index([merchantId, createdAt])
+  @@index([customerPhone])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Decimal @db.Decimal(10, 3)
+  unitPrice Decimal @db.Decimal(10, 3)
+  subtotal  Decimal @db.Decimal(10, 3)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
 }

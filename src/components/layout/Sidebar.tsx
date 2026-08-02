@@ -55,6 +55,12 @@ const navigationItems: NavItem[] = [
     group: 'main'
   },
   {
+    href: '/orders',
+    label: 'Orders',
+    icon: ShoppingBag,
+    group: 'main'
+  },
+  {
     href: '/expenses',
     label: 'Expenses',
     icon: ClipboardList,

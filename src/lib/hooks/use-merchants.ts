@@ -39,7 +39,7 @@ async function createMerchant(data: any) {
 
 async function updateMerchant({ id, data }: { id: string; data: any }) {
   const response = await fetch(`/api/merchants/${id}`, {
-    method: 'PUT',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
@@ -72,13 +72,30 @@ export function useMerchants() {
 /**
  * Fetch single merchant by ID
  */
-export function useMerchant() {
+export function useMeMerchant() {
   return useQuery({
     queryKey: ['merchant-by-id'],
     queryFn: () => fetchMerchantMe(),
     enabled: true,
   });
 }
+
+
+export function useMerchant(id: string) {
+  return useQuery({
+    queryKey: ['merchant', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/merchants/${id}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? 'Could not load merchant');
+      }
+      return res.json();
+    },
+    enabled: !!id,
+  });
+}
+
 
 /**
  * Create new merchant

@@ -53,7 +53,7 @@ export const useMerchantStore = create<InventoryStore>()(
 
             updateMerchant: (id, updates) =>
                 set(state => ({
-                    merchants: state.merchants.map(m =>
+                    merchants: state?.merchants?.map(m =>
                         m.id === id ? { ...m, ...updates } : m
                     )
                 })),
