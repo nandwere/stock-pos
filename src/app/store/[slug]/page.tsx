@@ -57,7 +57,7 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
         deliveryFee: Number(merchant.deliveryFee),
       }}
       categories={categories}
-      products={products.map((p: { sellingPrice: any; currentStock: any; }) => ({
+      products={products.map((p: any) => ({
         ...p,
         sellingPrice: Number(p.sellingPrice),
         currentStock: Number(p.currentStock),
