@@ -74,23 +74,20 @@ export async function PUT(
         },
       }
     });
-    const { categoryId, category, ...updateData } = body;
+    const { category, ...updateData } = body;
     const existingCategory = await prisma.category.findUnique({
-      where: { id: categoryId, merchantId },
+      where: { id: category, merchantId },
       include: {
 
       }
     });
-
-    console.log('Updating product with data:', { id, updateData, category });
-
 
     // Update sale logic
     const updatedSale = await prisma.product.update({
       where: { id, merchantId },
       data: {
         ...updateData,
-        categoryId: categoryId || existingCategory?.id,
+        categoryId: category || existingCategory?.id,
         updatedAt: new Date().toISOString()
       },
       include: { category: true }
