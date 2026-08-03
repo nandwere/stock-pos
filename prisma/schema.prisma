@@ -147,6 +147,8 @@ model Product {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  imageUrl          String?
+  imagePublicId     String?
 
   merchant    Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   category    Category          @relation(fields: [categoryId], references: [id])

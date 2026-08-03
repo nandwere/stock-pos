@@ -17,6 +17,7 @@ import { useCategories, useCreateProduct, useProduct, useUpdateProduct } from '@
 import { Category } from '@/types';
 import { useToast } from '../ui/toast-provider';
 import Loading from '@/app/(dashboard)/inventory/[id]/edit/loading';
+import { ProductImageUpload } from '@/components/ProductImageUpload';
 
 interface FormData {
   name: string;
@@ -93,6 +94,14 @@ export default function AddProductPage() {
     ? ((sellingPrice - costPrice) / sellingPrice * 100).toFixed(3)
     : '0.000';
 
+  // Used for the sidebar preview (value/status/alert). parseFloat, not
+  // parseInt — currentStock and reorderLevel are Decimal(10,3) in the
+  // schema, so a value like "15.75" truncating to 15 via parseInt would
+  // misreport stock status for anything sold by weight/volume rather than
+  // whole units.
+  const currentStockNum = parseFloat(formData.currentStock) || 0;
+  const reorderLevelNum = parseFloat(formData.reorderLevel) || 0;
+
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof FormData, string>> = {};
 
@@ -135,7 +144,6 @@ export default function AddProductPage() {
     e.preventDefault();
 
     if (!validateForm()) {
-      console.log('Invalid Form');
       toast({
         title: 'Validation Error',
         description: 'Please check the form for errors',
@@ -153,66 +161,64 @@ export default function AddProductPage() {
 
     setIsSubmitting(true);
 
+    // NOTE: deliberately does NOT include an `id` field. The previous
+    // version set `id: Date.now().toString()` here unconditionally — for
+    // an update, that value would flow into the payload alongside the
+    // real product being edited. If the update API spreads this object
+    // into a Prisma `data` argument without stripping `id`, it would
+    // attempt to change the product's PRIMARY KEY on every save, breaking
+    // every foreign key that points at it (SaleItem, StockAdjustment,
+    // StockCount, OrderItem, ...). Creation should let the database
+    // generate the real id (Prisma's `@default(cuid())`), not a client
+    // timestamp string that isn't even a valid cuid.
+    const productPayload = {
+      name: formData.name,
+      sku: formData.sku,
+      barcode: formData.barcode || undefined,
+      category: formData.category,
+      costPrice: parseFloat(formData.costPrice),
+      sellingPrice: parseFloat(formData.sellingPrice),
+      currentStock: parseFloat(formData.currentStock),
+      reorderLevel: parseFloat(formData.reorderLevel),
+      unit: formData.unit,
+      description: formData.description,
+      isActive: formData.isActive,
+      updatedAt: new Date().toISOString(),
+      ...(isNew ? { createdAt: new Date().toISOString() } : {}),
+    };
+
     try {
-      const newProduct = {
-        ...(!isNew ? product : {}),
-        id: Date.now().toString(),
-        name: formData.name,
-        sku: formData.sku,
-        barcode: formData.barcode || undefined,
-        category: formData.category,
-        costPrice: parseFloat(formData.costPrice),
-        sellingPrice: parseFloat(formData.sellingPrice),
-        currentStock: parseFloat(formData.currentStock),
-        reorderLevel: parseInt(formData.reorderLevel),
-        unit: formData.unit,
-        description: formData.description,
-        isActive: formData.isActive,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      isNew && createProduct.mutateAsync(newProduct).then(() => {
+      if (isNew) {
+        await createProduct.mutateAsync(productPayload);
         toast({
-          title: 'Product Added`',
+          title: 'Product added',
+          description: `${formData.name} has been added successfully`,
+          variant: 'default'
+        });
+      } else {
+        await updateProduct.mutateAsync({ id: product.id, data: productPayload });
+        toast({
+          title: 'Product updated',
           description: `${formData.name} has been updated successfully`,
           variant: 'default'
         });
-        router.push('/inventory');
-        router.refresh();
-      }).catch((err) => {
-        console.error('Error creating product:', err);
-        toast({
-          title: 'Error',
-          description: 'Failed to add product. Please try again.',
-          variant: 'destructive'
-        });
-      });
+      }
 
-      !isNew && updateProduct.mutateAsync({ id: product.id, data: newProduct }).then(() => {
-        toast({
-          title: 'Product Updated',
-          description: `${formData.name} has been updated successfully`,
-          variant: 'default'
-        });
-        // Redirect to inventory list
-        router.push('/inventory');
-        router.refresh();
-      }).catch(error => {
-        toast({
-          title: 'Error',
-          description: 'Failed to update product. Please try again.',
-          variant: 'destructive'
-        });
-      });
+      router.push('/inventory');
+      router.refresh();
     } catch (error) {
-      console.error('Error adding product:', error);
+      console.error(`Error ${isNew ? 'creating' : 'updating'} product:`, error);
       toast({
         title: 'Error',
-        description: 'Failed to add product. Please try again.',
+        description: `Failed to ${isNew ? 'add' : 'update'} product. Please try again.`,
         variant: 'destructive'
       });
     } finally {
+      // Now runs only after the mutation actually settles — previously
+      // this fired almost immediately (the mutateAsync calls weren't
+      // awaited), so the spinner would disappear and the submit button
+      // would re-enable well before the request finished, allowing a
+      // double-submit if the user clicked again.
       setIsSubmitting(false);
     }
   };
@@ -261,8 +267,12 @@ export default function AddProductPage() {
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Add New Product</h1>
-            <p className="text-gray-600 mt-1">Add a new product to your inventory</p>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {isNew ? 'Add New Product' : 'Edit Product'}
+            </h1>
+            <p className="text-gray-600 mt-1">
+              {isNew ? 'Add a new product to your inventory' : 'Update product details'}
+            </p>
           </div>
         </div>
       </div>
@@ -400,6 +410,15 @@ export default function AddProductPage() {
                     Cost Price *
                   </label>
                   <div className="relative">
+                    {/* NOTE: hardcoded "$" — your Merchant model has a
+                        per-tenant `currency` field (e.g. "KES"), and the
+                        rest of the app (storefront) formats money with
+                        Intl.NumberFormat against that currency. This input
+                        doesn't have access to the merchant's currency from
+                        here, so it's left as-is rather than guessing —
+                        worth passing merchant currency down as a prop if
+                        this component doesn't already have it some other
+                        way. */}
                     <span className="absolute left-3 top-2.5 text-gray-500">$</span>
                     <input
                       type="number"
@@ -572,7 +591,7 @@ export default function AddProductPage() {
                 {isSubmitting ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Adding...
+                    {isNew ? 'Adding...' : 'Saving...'}
                   </>
                 ) : (
                   <>
@@ -588,6 +607,35 @@ export default function AddProductPage() {
         {/* Sidebar */}
         <div className="lg:col-span-1">
           <div className="sticky top-6 space-y-6">
+            {/* Product Image */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Image</h3>
+
+              {isNew ? (
+                <div className="flex items-start gap-3 text-sm text-gray-500 bg-gray-50 rounded-lg p-4">
+                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>Save the product first, then come back here to add a photo.</span>
+                </div>
+              ) : product ? (
+                <ProductImageUpload
+                  productId={product.id}
+                  currentImageUrl={product?.imageUrl}
+                  onUploaded={() => {
+                    toast({
+                      title: 'Image updated',
+                      description: 'Product image saved.',
+                      variant: 'default',
+                    });
+                  }}
+                />
+              ) : (
+                <div className="flex items-start gap-3 text-sm text-red-500 bg-red-50 rounded-lg p-4">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>Product not found — can't attach an image.</span>
+                </div>
+              )}
+            </div>
+
             {/* Quick Stats */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Preview</h3>
@@ -596,21 +644,21 @@ export default function AddProductPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Product Value</span>
                   <span className="font-medium text-gray-900">
-                    {formatCurrency((parseInt(formData.currentStock) || 0) * costPrice)}
+                    {formatCurrency(currentStockNum * costPrice)}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Stock Status</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${(parseInt(formData.currentStock) || 0) === 0
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${currentStockNum === 0
                     ? 'bg-red-100 text-red-800'
-                    : (parseInt(formData.currentStock) || 0) <= (parseInt(formData.reorderLevel) || 0)
+                    : currentStockNum <= reorderLevelNum
                       ? 'bg-orange-100 text-orange-800'
                       : 'bg-green-100 text-green-800'
                     }`}>
-                    {(parseInt(formData.currentStock) || 0) === 0
+                    {currentStockNum === 0
                       ? 'Out of Stock'
-                      : (parseInt(formData.currentStock) || 0) <= (parseInt(formData.reorderLevel) || 0)
+                      : currentStockNum <= reorderLevelNum
                         ? 'Low Stock'
                         : 'In Stock'}
                   </span>
@@ -619,7 +667,7 @@ export default function AddProductPage() {
                 <div className="pt-4 border-t border-gray-200">
                   <div className="text-sm text-gray-600 mb-2">Stock Alert</div>
                   <div className="text-sm text-gray-900">
-                    {(parseInt(formData.currentStock) || 0) <= (parseInt(formData.reorderLevel) || 0) ? (
+                    {currentStockNum <= reorderLevelNum ? (
                       <div className="flex items-center gap-2 text-orange-600">
                         <AlertCircle className="w-4 h-4" />
                         Stock is at or below reorder level

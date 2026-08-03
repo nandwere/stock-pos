@@ -10,7 +10,13 @@ interface Product {
   currentStock: number;
   unit: string;
   categoryId: string;
+  imageUrl: string | null;
 }
+
+// Below this many units, show a "Only N left" warning. Above it, the exact
+// count isn't shown at all — most customers don't need to know there are
+// "88 Kg left," only that there's plenty.
+const LOW_STOCK_THRESHOLD = 5;
 
 interface Category {
   id: string;
@@ -100,7 +106,7 @@ export function StorefrontClient({
     setCart((prev) => {
       const existing = prev.find((l) => l.productId === productId);
       const product = productMap.get(productId);
-      if (!product) return prev;
+      if (!product || product.currentStock <= 0) return prev;
 
       if (existing) {
         if (existing.quantity >= product.currentStock) return prev; // don't exceed stock
@@ -148,7 +154,6 @@ export function StorefrontClient({
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
-      {/* ── Header ── */}
       <header className="bg-white border-b sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -218,40 +223,70 @@ export function StorefrontClient({
       <div className="max-w-5xl mx-auto px-4 pb-24 grid grid-cols-2 md:grid-cols-3 gap-4">
         {filteredProducts.map((p) => {
           const inCart = cart.find((l) => l.productId === p.id);
+          const outOfStock = p.currentStock <= 0;
+          const lowStock = !outOfStock && p.currentStock <= LOW_STOCK_THRESHOLD;
+
           return (
-            <div key={p.id} className="bg-white border rounded-xl p-4 flex flex-col">
-              <h3 className="font-semibold">{p.name}</h3>
-              {p.description && <p className="text-sm text-gray-500 line-clamp-2 mt-1">{p.description}</p>}
-              <div className="mt-auto pt-3 flex items-center justify-between">
-                <span className="font-bold">{formatMoney(p.sellingPrice, store.currency)}</span>
-                <span className="text-xs text-gray-400">{p.currentStock} {p.unit} left</span>
+            <div
+              key={p.id}
+              className={`bg-white border rounded-xl overflow-hidden flex flex-col ${outOfStock ? 'opacity-60' : ''}`}
+            >
+              <div className="aspect-square bg-gray-100 relative">
+                {p.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">📦</div>
+                )}
+                {outOfStock && (
+                  <span className="absolute top-2 left-2 bg-gray-900/80 text-white text-xs px-2 py-0.5 rounded-full">
+                    Out of stock
+                  </span>
+                )}
               </div>
 
-              {inCart ? (
-                <div className="mt-2 flex items-center justify-between border rounded-lg">
-                  <button
-                    className="px-3 py-1 text-lg"
-                    onClick={() => updateQuantity(p.id, inCart.quantity - 1)}
-                  >
-                    −
-                  </button>
-                  <span>{inCart.quantity}</span>
-                  <button
-                    className="px-3 py-1 text-lg"
-                    onClick={() => updateQuantity(p.id, inCart.quantity + 1)}
-                    disabled={inCart.quantity >= p.currentStock}
-                  >
-                    +
-                  </button>
+              <div className="p-4 flex flex-col flex-1">
+                <h3 className="font-semibold">{p.name}</h3>
+                {p.description && <p className="text-sm text-gray-500 line-clamp-2 mt-1">{p.description}</p>}
+                <div className="mt-auto pt-3 flex items-center justify-between">
+                  <span className="font-bold">{formatMoney(p.sellingPrice, store.currency)}</span>
+                  {lowStock && (
+                    <span className="text-xs text-amber-600 font-medium">
+                      Only {p.currentStock} {p.unit} left
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <button
-                  onClick={() => addToCart(p.id)}
-                  className="mt-2 bg-emerald-600 text-white rounded-lg py-1.5 font-medium"
-                >
-                  Add
-                </button>
-              )}
+
+                {outOfStock ? (
+                  <button disabled className="mt-2 bg-gray-200 text-gray-400 rounded-lg py-1.5 font-medium cursor-not-allowed">
+                    Out of stock
+                  </button>
+                ) : inCart ? (
+                  <div className="mt-2 flex items-center justify-between border rounded-lg">
+                    <button
+                      className="px-3 py-1 text-lg"
+                      onClick={() => updateQuantity(p.id, inCart.quantity - 1)}
+                    >
+                      −
+                    </button>
+                    <span>{inCart.quantity}</span>
+                    <button
+                      className="px-3 py-1 text-lg"
+                      onClick={() => updateQuantity(p.id, inCart.quantity + 1)}
+                      disabled={inCart.quantity >= p.currentStock}
+                    >
+                      +
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => addToCart(p.id)}
+                    className="mt-2 bg-emerald-600 text-white rounded-lg py-1.5 font-medium"
+                  >
+                    Add
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
@@ -282,11 +317,21 @@ export function StorefrontClient({
                   if (!product) return null;
                   return (
                     <div key={line.productId} className="flex justify-between items-center py-3 border-b">
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-gray-500">
-                          {formatMoney(product.sellingPrice, store.currency)} × {line.quantity}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
+                          {product.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">📦</div>
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium">{product.name}</p>
+                          <p className="text-sm text-gray-500">
+                            {formatMoney(product.sellingPrice, store.currency)} × {line.quantity}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button onClick={() => updateQuantity(line.productId, line.quantity - 1)}>−</button>

@@ -35,7 +35,7 @@ function resolveMerchantSlug(request: NextRequest): string {
 }
 
 // ── Route classification ───────────────────────────────────────────
-const PUBLIC_ROUTES = ['/login', '/forgot-password', '/reset-password'];
+const PUBLIC_ROUTES = ['/login', '/forgot-password', '/reset-password', '/store'];
 const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password'];
 
 // ── Middleware ─────────────────────────────────────────────────────
@@ -45,8 +45,13 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const slug = resolveMerchantSlug(request);
 
+  const PUBLIC_API_ROUTES = ['/api/storefront'];
+
   // API routes — only stamp the slug, skip all auth/redirect logic
   if (pathname.startsWith('/api')) {
+    if (PUBLIC_API_ROUTES.some(route => pathname.startsWith(route))) {
+      return withSlug(NextResponse.next());
+    }
     const response = NextResponse.next();
     response.headers.set('x-merchant-slug', slug);
     return response;

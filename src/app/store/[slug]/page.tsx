@@ -36,6 +36,8 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
         currentStock: true,
         unit: true,
         categoryId: true,
+        imageUrl: true,
+        imagePublicId: true,
       },
       orderBy: { name: 'asc' },
     }),
@@ -45,6 +47,10 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
       orderBy: { name: 'asc' },
     }),
   ]);
+
+
+  // console.log('Fetched products:', products); // Log the fetched products
+  // console.log('Fetched categories:', categories); // Log the fetched categories
 
   return (
     <StorefrontClient
