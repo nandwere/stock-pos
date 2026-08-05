@@ -249,7 +249,7 @@ export function StorefrontClient({
                 <h3 className="font-semibold">{p.name}</h3>
                 {p.description && <p className="text-sm text-gray-500 line-clamp-2 mt-1">{p.description}</p>}
                 <div className="mt-auto pt-3 flex items-center justify-between">
-                  <span className="font-bold">{formatMoney(p.sellingPrice, store.currency)}</span>
+                  <span className="font-bold">{formatMoney(p.sellingPrice, store.currency)} per kg</span>
                   {lowStock && (
                     <span className="text-xs text-amber-600 font-medium">
                       Only {p.currentStock} {p.unit} left

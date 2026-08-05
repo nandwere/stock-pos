@@ -31,6 +31,7 @@ interface FormData {
   unit: string;
   description: string;
   isActive: boolean;
+  showOnStorefront: boolean;
 }
 
 const UNITS = ['pcs', 'kg', 'g', 'l', 'ml', 'm', 'cm', 'box', 'pack', 'bottle'];
@@ -63,7 +64,8 @@ export default function AddProductPage() {
     reorderLevel: product?.reorderLevel?.toString() || '5',
     unit: product?.unit || 'pcs',
     description: product?.description || '',
-    isActive: product?.isActive !== undefined ? product.isActive : true
+    isActive: product?.isActive !== undefined ? product.isActive : true,
+    showOnStorefront: product?.showOnStorefront !== undefined ? product.showOnStorefront : true
   });
 
   const [showMarginWarning, setShowMarginWarning] = useState(false);
@@ -81,7 +83,8 @@ export default function AddProductPage() {
         reorderLevel: product?.reorderLevel?.toString() || '5',
         unit: product?.unit || 'pcs',
         description: product?.description || '',
-        isActive: product?.isActive !== undefined ? product.isActive : true
+        isActive: product?.isActive !== undefined ? product.isActive : true,
+        showOnStorefront: product?.showOnStorefront !== undefined ? product.showOnStorefront : true
       }));
     }
 
@@ -183,6 +186,7 @@ export default function AddProductPage() {
       unit: formData.unit,
       description: formData.description,
       isActive: formData.isActive,
+      showOnStorefront: formData.showOnStorefront,
       updatedAt: new Date().toISOString(),
       ...(isNew ? { createdAt: new Date().toISOString() } : {}),
     };
@@ -573,6 +577,27 @@ export default function AddProductPage() {
                   Product is active and available for sale
                 </label>
               </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showOnStorefront"
+                  checked={formData.showOnStorefront}
+                  disabled={!formData.isActive}
+                  onChange={(e) => handleChange('showOnStorefront', e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                />
+                <label
+                  htmlFor="showOnStorefront"
+                  className={`text-sm font-medium ${formData.isActive ? 'text-gray-700' : 'text-gray-400'}`}
+                >
+                  Show this product on the public online store
+                </label>
+              </div>
+              <p className="text-xs text-gray-400 pl-6 -mt-2">
+                {formData.isActive
+                  ? "Uncheck to sell in-store only — it stays out of online/delivery orders without deactivating it entirely."
+                  : 'An inactive product is never shown online, regardless of this setting.'}
+              </p>
             </div>
 
             {/* Form Actions */}

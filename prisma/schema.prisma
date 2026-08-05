@@ -149,6 +149,7 @@ model Product {
   updatedAt    DateTime @updatedAt
   imageUrl          String?
   imagePublicId     String?
+  showOnStorefront  Boolean   @default(true)
 
   merchant    Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   category    Category          @relation(fields: [categoryId], references: [id])

@@ -27,7 +27,7 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
 
   const [products, categories] = await Promise.all([
     prisma.product.findMany({
-      where: { merchantId: merchant.id, isActive: true, currentStock: { gt: 0 } },
+      where: { merchantId: merchant.id, isActive: true, currentStock: { gt: 0 }, showOnStorefront: true },
       select: {
         id: true,
         name: true,
@@ -36,13 +36,14 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
         currentStock: true,
         unit: true,
         categoryId: true,
+        showOnStorefront: true,
         imageUrl: true,
         imagePublicId: true,
       },
       orderBy: { name: 'asc' },
     }),
     prisma.category.findMany({
-      where: { merchantId: merchant.id },
+      where: { merchantId: merchant.id},
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),

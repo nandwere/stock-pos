@@ -32,6 +32,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       merchantId: merchant.id,
       isActive: true,
       currentStock: { gt: 0 },
+      showOnStorefront: true,
       ...(categoryId ? { categoryId } : {}),
       ...(search
         ? { name: { contains: search, mode: 'insensitive' } }
@@ -45,6 +46,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       currentStock: true,
       unit: true,
       categoryId: true,
+      showOnStorefront: true,
       category: { select: { id: true, name: true } },
     },
     orderBy: { name: 'asc' },

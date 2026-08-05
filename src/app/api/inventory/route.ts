@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
 
     const body = await request.json();
-    const { description, name, sku, category, costPrice, sellingPrice, currentStock, reorderLevel, unit, isActive } = body;
+    const { description, name, sku, category, costPrice, sellingPrice, currentStock, reorderLevel, unit, isActive, showOnStorefront } = body;
 
     if (!category || !name || !costPrice || !sellingPrice || !currentStock || !unit) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
@@ -80,8 +80,8 @@ export async function POST(request: NextRequest) {
     }
 
     const product = await prisma.product.create({
-      data: { merchantId, description, name, categoryId: category, sku, costPrice, sellingPrice, currentStock, reorderLevel, unit, isActive },
-      select: { id: true, sku: true, name: true, costPrice: true, sellingPrice: true, currentStock: true, unit: true, isActive: true, createdAt: true },
+      data: { merchantId, description, name, categoryId: category, sku, costPrice, sellingPrice, currentStock, reorderLevel, unit, isActive, showOnStorefront },
+      select: { id: true, sku: true, name: true, costPrice: true, sellingPrice: true, currentStock: true, unit: true, isActive: true, showOnStorefront: true, createdAt: true },
     });
 
     return NextResponse.json(product, { status: 201 });
