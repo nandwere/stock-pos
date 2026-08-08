@@ -35,10 +35,10 @@ export function POSInterface() {
   const getCartTotal = usePOSStore(state => state.getCartTotal);
 
   // React Query
-    const { data: products = [], isLoading, error } = useProducts({
+  const { data: products = [], isLoading, error } = useProducts({
     q: searchQuery.trim() || undefined,
   }) as { data: Product[]; isLoading: boolean; error: any };
-  
+
   const createSale = useCreateSale();
 
   // 👇 Client-side fallback filter — covers cases where the API
@@ -47,8 +47,8 @@ export function POSInterface() {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return products;
     return products.filter(p =>
-      p.name.toLowerCase().includes(q)    ||
-      p.sku.toLowerCase().includes(q)     ||
+      p.name.toLowerCase().includes(q) ||
+      p.sku.toLowerCase().includes(q) ||
       (p.barcode ?? '').toLowerCase().includes(q)
     );
   }, [products, searchQuery]);
@@ -63,6 +63,7 @@ export function POSInterface() {
           quantity: item.quantity,
           unitPrice: Number(item.unitPrice),
         })),
+        ...paymentData,
         paymentMethod: paymentData.paymentMethod,
         customerName: paymentData.customerName,
         discount: totals.discount,
@@ -98,7 +99,7 @@ export function POSInterface() {
               autoFocus
             />
 
-             {/* 👇 Clear button — instant reset */}
+            {/* 👇 Clear button — instant reset */}
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
@@ -438,12 +439,26 @@ function CartItemCard({ item, onUpdateQuantity, onRemove }: any) {
 // Payment Modal Component
 function PaymentModal({ total, onClose, onComplete }: any) {
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CREDIT' | 'MOBILE_MONEY'>('CASH');
-  const [amountPaid, setAmountPaid]       = useState(total.toString());
-  const [customerName, setCustomerName]   = useState('');
-  const [submitting, setSubmitting]       = useState(false);  // ← guard
+  const [amountPaid, setAmountPaid] = useState(total.toString());
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [submitting, setSubmitting] = useState(false);  // ← guard
+  const isCredit = paymentMethod === 'CREDIT';
 
-  const change     = Math.max(0, parseFloat(amountPaid || '0') - total);
-  const canComplete = parseFloat(amountPaid || '0') >= total && !submitting;
+  // Basic phone sanity check — adjust regex to your market (this is loose E.164-ish)
+  const phoneValid = /^\+?\d{7,15}$/.test(customerPhone.trim());
+
+  const creditFieldsValid =
+    !isCredit || (customerName.trim().length > 0 && phoneValid && dueDate.length > 0);
+
+  // For credit sales, amount paid can legitimately be 0 (nothing paid up front)
+  const amountValid = isCredit
+    ? parseFloat(amountPaid || '0') >= 0
+    : parseFloat(amountPaid || '0') >= total;
+
+  const change = Math.max(0, parseFloat(amountPaid || '0') - total);
+    const canComplete = amountValid && creditFieldsValid && !submitting;
 
   const handleComplete = async () => {
     // Hard-block any second invocation while the first is in-flight
@@ -453,9 +468,13 @@ function PaymentModal({ total, onClose, onComplete }: any) {
     try {
       await onComplete({
         paymentMethod,
-        amountPaid:   parseFloat(amountPaid),
+        amountPaid: parseFloat(amountPaid),
         change,
         customerName: customerName || undefined,
+        ...(isCredit && {
+          customerPhone: customerPhone.trim(),
+          dueDate, // ISO date string, e.g. "2026-08-22"
+        }),
       });
       // onComplete is responsible for closing the modal on success.
       // If it throws, we re-enable the button so the cashier can retry.
@@ -493,19 +512,18 @@ function PaymentModal({ total, onClose, onComplete }: any) {
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { value: 'CASH',         icon: Banknote,   label: 'Cash'   },
-                { value: 'CREDIT',       icon: CreditCard, label: 'Credit' },
+                { value: 'CASH', icon: Banknote, label: 'Cash' },
+                { value: 'CREDIT', icon: CreditCard, label: 'Credit' },
                 { value: 'MOBILE_MONEY', icon: Smartphone, label: 'M-Pesa' },
               ].map(({ value, icon: Icon, label }) => (
                 <button
                   key={value}
                   onClick={() => !submitting && setPaymentMethod(value as any)}
                   disabled={submitting}
-                  className={`p-3 border rounded-lg flex flex-col items-center gap-2 transition-colors disabled:opacity-50 ${
-                    paymentMethod === value
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
+                  className={`p-3 border rounded-lg flex flex-col items-center gap-2 transition-colors disabled:opacity-50 ${paymentMethod === value
+                    ? 'border-blue-600 bg-blue-50'
+                    : 'border-gray-300 hover:border-gray-400'
+                    }`}
                 >
                   <Icon className="w-6 h-6" />
                   <span className="text-sm font-medium">{label}</span>
@@ -516,7 +534,7 @@ function PaymentModal({ total, onClose, onComplete }: any) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Amount Paid
+              Amount Paid {isCredit && <span className="text-gray-400 font-normal">(deposit, optional)</span>}
             </label>
             <input
               type="number"
@@ -525,11 +543,12 @@ function PaymentModal({ total, onClose, onComplete }: any) {
               disabled={submitting}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
               step="0.01"
-              min={total}
+              min={0}
+              max={isCredit ? total : undefined}
             />
           </div>
 
-          {change > 0 && (
+          {change > 0 && !isCredit && (
             <div className="bg-green-50 p-4 rounded-lg">
               <div className="text-sm text-gray-600 mb-1">Change</div>
               <div className="text-2xl font-bold text-green-600">
@@ -538,19 +557,75 @@ function PaymentModal({ total, onClose, onComplete }: any) {
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Customer Name (Optional)
-            </label>
-            <input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              disabled={submitting}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              placeholder="Enter customer name"
-            />
-          </div>
+          {isCredit && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-4">
+              <div className="text-sm font-semibold text-amber-800">
+                Credit sale — customer details required
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Customer Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  disabled={submitting}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                  placeholder="Full name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  disabled={submitting}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 ${customerPhone && !phoneValid ? 'border-red-400' : 'border-gray-300'
+                    }`}
+                  placeholder="+254 7XX XXX XXX"
+                />
+                {customerPhone && !phoneValid && (
+                  <p className="text-xs text-red-500 mt-1">Enter a valid phone number</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Repayment Due Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  disabled={submitting}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                />
+              </div>
+            </div>
+          )}
+
+          {!isCredit && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Customer Name (Optional)
+              </label>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                disabled={submitting}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                placeholder="Enter customer name"
+              />
+            </div>
+          )}
         </div>
 
         <div className="p-6 border-t flex gap-3">

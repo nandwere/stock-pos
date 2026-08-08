@@ -14,10 +14,12 @@ import {
   Tag,
   ShoppingBag,
   Building2,
+  CreditCard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@/types';
 import { useSettings } from '@/lib/hooks/use-settings';
+import { useCreditSummary } from '@/lib/hooks/use-credit-summary';
 
 interface NavItem {
   href: string;
@@ -52,6 +54,12 @@ const navigationItems: NavItem[] = [
     href: '/sales',
     label: 'Sales History',
     icon: ShoppingBag,
+    group: 'main'
+  },
+  {
+    href: '/sales/credit',
+    label: 'Credit Sales',
+    icon: CreditCard,
     group: 'main'
   },
   {
@@ -151,6 +159,7 @@ interface SidebarProps {
 
 export function Sidebar({ user }: SidebarProps) {
   const { data, isLoading, error } = useSettings();
+  const overdueCount = useCreditSummary();
 
   const pathname = usePathname();
 
@@ -209,6 +218,11 @@ export function Sidebar({ user }: SidebarProps) {
                   >
                     <Icon className="w-5 h-5" />
                     <span>{item.label}</span>
+                    {item.href === '/sales/credit' && overdueCount > 0 && (
+                      <span className="ml-auto bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                        {overdueCount}
+                      </span>
+                    )}
                   </Link>
                 </li>
               </div>

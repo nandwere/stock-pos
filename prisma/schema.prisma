@@ -175,6 +175,10 @@ model Sale {
   saleNumber    String        @unique
   userId        String
   customerName  String?
+  customerPhone  String?   // required at the API layer when paymentMethod == CREDIT
+  dueDate        DateTime? // required at the API layer when paymentMethod == CREDIT
+  reminderSentAt DateTime? // null = not yet notified; set once the cron job sends it
+  notifiedAt    DateTime?  
   paymentMethod PaymentMethod
   subtotal      Decimal       @db.Decimal(10, 3)
   tax           Decimal       @default(0) @db.Decimal(10, 3)

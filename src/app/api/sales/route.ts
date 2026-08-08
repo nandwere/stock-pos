@@ -4,10 +4,6 @@ import { generateSaleNumber } from '@/lib/stock-calculations';
 import { getCurrentUser, getSession } from '@/lib/auth';
 import { PaymentMethod } from '@prisma/client';
 
-// Thrown from inside the transaction when a product can't cover the
-// requested quantity at the moment of the actual decrement (not at some
-// earlier, now-stale check) — caught below and mapped to a 400, everything
-// else falls through to the generic 500.
 class InsufficientStockError extends Error {
   constructor(public productName: string, public available: number, public requested: number) {
     super(`Insufficient stock for ${productName}. Available: ${available}, Requested: ${requested}`);
@@ -15,10 +11,11 @@ class InsufficientStockError extends Error {
   }
 }
 
-// Guards against float drift (e.g. 19.999999999998) ever reaching a
-// Decimal(10,3) column — round every computed monetary value before it's
-// used in a Prisma write.
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+// Loose E.164-ish check — same rule the frontend uses, enforced again here
+// because client-side validation is a UX nicety, not a guarantee.
+const isValidPhone = (phone: string) => /^\+?\d{7,15}$/.test(phone.trim());
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,12 +30,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { items, paymentMethod, customerName, notes } = body;
+    const { items, paymentMethod, customerName, customerPhone, dueDate, amountPaid, notes } = body;
 
-    // ── Input validation ──────────────────────────────────────────────────
-    // None of this existed before — a malformed request (empty items,
-    // garbage payment method, negative quantity) previously fell all the
-    // way through to a Prisma-level error and a confusing generic 500.
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'At least one item is required' }, { status: 400 });
     }
@@ -57,9 +50,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Cost snapshot — a plain read, doesn't need the same per-row locking
-    // the stock decrement below does, so it's fine to do up front rather
-    // than inside the transaction.
+    // ── Credit-specific validation ──────────────────────────────────────
+    // Mirrors the PaymentModal's requiredness rules, re-checked server-side.
+    let parsedDueDate: Date | undefined;
+    if (paymentMethod === PaymentMethod.CREDIT) {
+      if (!customerName || typeof customerName !== 'string' || !customerName.trim()) {
+        return NextResponse.json({ error: 'customerName is required for credit sales' }, { status: 400 });
+      }
+      if (!customerPhone || !isValidPhone(customerPhone)) {
+        return NextResponse.json({ error: 'A valid customerPhone is required for credit sales' }, { status: 400 });
+      }
+      if (!dueDate) {
+        return NextResponse.json({ error: 'dueDate is required for credit sales' }, { status: 400 });
+      }
+      parsedDueDate = new Date(dueDate);
+      if (isNaN(parsedDueDate.getTime())) {
+        return NextResponse.json({ error: 'dueDate is not a valid date' }, { status: 400 });
+      }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (parsedDueDate < today) {
+        return NextResponse.json({ error: 'dueDate cannot be in the past' }, { status: 400 });
+      }
+      if (amountPaid != null && (typeof amountPaid !== 'number' || amountPaid < 0)) {
+        return NextResponse.json({ error: 'amountPaid must be a non-negative number' }, { status: 400 });
+      }
+    }
+
     const products = await prisma.product.findMany({
       where: { id: { in: items.map((i: any) => i.productId) }, merchantId },
       select: { id: true, name: true, costPrice: true },
@@ -72,12 +89,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── Build line items ────────────────────────────────────────────────
-    // SaleItem.subtotal is NET of that line's own discount (what this line
-    // actually contributed) — this is what makes profit reporting simple:
-    // revenue for a line is just item.subtotal, no separate discount
-    // allocation needed. Sale.subtotal/discount/total instead follow the
-    // conventional gross → discount → net pattern at the whole-sale level.
     const lineItems = items.map((item: any) => {
       const product = productById.get(item.productId)!;
       const gross = round3(item.quantity * item.unitPrice);
@@ -88,16 +99,31 @@ export async function POST(request: NextRequest) {
         productId: item.productId,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        costPrice: Number(product.costPrice), // snapshot — historical profit stays correct even after Product.costPrice later changes
+        costPrice: Number(product.costPrice),
         discount,
         subtotal: net,
-        _gross: gross, // not persisted — only used below to build Sale-level totals
+        _gross: gross,
       };
     });
 
     const saleSubtotal = round3(lineItems.reduce((sum, li) => sum + li._gross, 0));
     const saleDiscount = round3(lineItems.reduce((sum, li) => sum + li.discount, 0));
-    const saleTotal = round3(saleSubtotal - saleDiscount); // add + tax here once tax is computed elsewhere in this route
+    const saleTotal = round3(saleSubtotal - saleDiscount);
+
+    // Cash/mobile money: must cover the total (enforced by the modal already,
+    // re-derived here rather than trusted). Credit: whatever deposit was
+    // paid up front, defaulting to 0.
+    const resolvedAmountPaid =
+      paymentMethod === PaymentMethod.CREDIT
+        ? round3(amountPaid ?? 0)
+        : saleTotal;
+
+    if (paymentMethod !== PaymentMethod.CREDIT && resolvedAmountPaid < saleTotal) {
+      return NextResponse.json({ error: 'amountPaid must cover the total for non-credit sales' }, { status: 400 });
+    }
+    if (paymentMethod === PaymentMethod.CREDIT && resolvedAmountPaid > saleTotal) {
+      return NextResponse.json({ error: 'amountPaid cannot exceed the total' }, { status: 400 });
+    }
 
     const sale = await prisma.$transaction(async (tx) => {
       const newSale = await tx.sale.create({
@@ -106,30 +132,21 @@ export async function POST(request: NextRequest) {
           merchantId,
           userId: user.id,
           customerName,
+          customerPhone: paymentMethod === PaymentMethod.CREDIT ? customerPhone.trim() : undefined,
+          dueDate: parsedDueDate,
           notes,
           paymentMethod,
           subtotal: saleSubtotal,
           discount: saleDiscount,
           total: saleTotal,
-          amountPaid: saleTotal, // if you want cash change-due support, accept amountPaid from the request body instead and compute `change` from it
+          amountPaid: resolvedAmountPaid,
           items: {
-            create: lineItems.map(({ _gross, ...li }) => li), // strip the local-only _gross field before persisting
+            create: lineItems.map(({ _gross, ...li }) => li),
           },
         },
         include: { items: true },
       });
 
-      // Atomic, race-safe stock decrement. The WHERE clause's
-      // `currentStock: { gte: quantity }` and the decrement happen as ONE
-      // conditional UPDATE — so two concurrent checkouts for the same
-      // product can't both pass a "there's enough stock" check and then
-      // both decrement past zero. Whichever transaction's UPDATE commits
-      // first wins; the second sees `count === 0` and the whole sale rolls
-      // back instead of overselling.
-      //
-      // This replaces the old pattern of checking stock in a separate
-      // query BEFORE the transaction even started, then decrementing
-      // unconditionally inside it — which had exactly that race.
       for (const item of items) {
         const product = productById.get(item.productId)!;
         const result = await tx.product.updateMany({
