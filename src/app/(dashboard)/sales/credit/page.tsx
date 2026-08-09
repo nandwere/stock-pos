@@ -15,6 +15,7 @@ type CreditSale = {
   dueDate: string | null;
   isOverdue: boolean;
   notifiedAt: string | null;
+  createdAt: string; // ← new — sale date
 };
 
 export default function CreditSalesPage() {
@@ -61,6 +62,8 @@ export default function CreditSalesPage() {
             <tr>
               <th className="p-3">Customer</th>
               <th className="p-3">Phone</th>
+              <th className="p-3">Sale Date</th>
+              <th className="p-3">Sale Total</th>
               <th className="p-3">Balance</th>
               <th className="p-3">Due Date</th>
               <th className="p-3">Status</th>
@@ -72,6 +75,8 @@ export default function CreditSalesPage() {
               <tr key={s.id} className={`border-t ${s.isOverdue ? 'bg-red-50' : ''}`}>
                 <td className="p-3 font-medium">{s.customerName ?? '—'}</td>
                 <td className="p-3">{s.customerPhone ?? '—'}</td>
+                <td className="p-3 text-gray-500">{new Date(s.createdAt).toLocaleDateString()}</td>
+                <td className="p-3">{formatCurrency(s.total)}</td>
                 <td className="p-3 font-semibold">{formatCurrency(s.balance)}</td>
                 <td className="p-3">{s.dueDate ? new Date(s.dueDate).toLocaleDateString() : '—'}</td>
                 <td className="p-3">
@@ -92,7 +97,7 @@ export default function CreditSalesPage() {
               </tr>
             ))}
             {sales.length === 0 && (
-              <tr><td colSpan={6} className="p-6 text-center text-gray-400">No outstanding credit sales.</td></tr>
+              <tr><td colSpan={8} className="p-6 text-center text-gray-400">No outstanding credit sales.</td></tr>
             )}
           </tbody>
         </table>
