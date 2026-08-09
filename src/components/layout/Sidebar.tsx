@@ -168,6 +168,17 @@ export function Sidebar({ user }: SidebarProps) {
     !item.roles || item.roles.includes(user.role)
   );
 
+  // The href of the *most specific* matching nav item for the current path —
+  // i.e. the longest href that's either an exact match or a path prefix.
+  // Only that one item gets highlighted, so a parent route (e.g. /sales)
+  // doesn't stay lit while on a more specific child route (e.g. /sales/credit).
+  const activeHref = visibleItems.reduce<string | null>((best, item) => {
+    const matches = pathname === item.href || pathname.startsWith(item.href + '/');
+    if (!matches) return best;
+    if (best === null || item.href.length > best.length) return item.href;
+    return best;
+  }, null);
+
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
       {/* Logo/Brand */}
@@ -187,9 +198,7 @@ export function Sidebar({ user }: SidebarProps) {
       <nav className="flex-1 overflow-y-auto py-4">
         <ul className="space-y-1 px-3">
           {visibleItems.map((item, index) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== '/' && pathname.startsWith(item.href));
+            const isActive = item.href === activeHref;
 
             const Icon = item.icon;
 
