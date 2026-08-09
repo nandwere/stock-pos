@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession, hasPermission } from '@/lib/auth';
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession();
     if (!session) {
@@ -14,7 +14,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const existing = await prisma.category.findFirst({ where: { id: params.id, merchantId } });
+    const paramsData = await params;
+    const existing = await prisma.category.findFirst({ where: { id: paramsData.id, merchantId } });
     if (!existing) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 });
     }
@@ -27,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     const category = await prisma.category.update({
-      where: { id: params.id },
+      where: { id: paramsData.id },
       data: {
         ...(name != null && { name: name.trim() }),
         ...(description !== undefined && { description }),
@@ -44,7 +45,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession();
     if (!session) {
@@ -56,8 +57,9 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const paramsData = await params;
     const existing = await prisma.category.findFirst({
-      where: { id: params.id, merchantId },
+      where: { id: paramsData.id, merchantId },
       include: { _count: { select: { products: true } } },
     });
     if (!existing) {
@@ -74,7 +76,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       );
     }
 
-    await prisma.category.delete({ where: { id: params.id } });
+    await prisma.category.delete({ where: { id: paramsData.id } });
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Categories DELETE error:', error);
