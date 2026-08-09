@@ -96,6 +96,13 @@ const navigationItems: NavItem[] = [
     group: 'inventory'
   },
   {
+    href: '/categories',
+    label: 'Categories',
+    icon: Tag,
+    roles: ['OWNER', 'MANAGER'],
+    group: 'inventory'
+  },
+  {
     href: '/stock-count',
     label: 'Stock Count',
     icon: ClipboardList,

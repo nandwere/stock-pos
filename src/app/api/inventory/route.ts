@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
           // Assuming you have a Category model relation
           category: true, // This will include the full category object
         },
-      }),
+      },),
       prisma.product.count({ where }),
     ]);
     return NextResponse.json({ data: data || [], meta: { total } });
@@ -58,16 +58,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const { merchantId } = session;
+
+    // Catches exactly the case that produced this error — a session that
+    // exists but doesn't carry merchantId — before it reaches Prisma as a
+    // confusing "Argument `merchant` is missing" instead of this clear one.
+    if (!merchantId) {
+      console.error('Session missing merchantId:', session);
+      return NextResponse.json({ error: 'Session is missing merchant context' }, { status: 401 });
+    }
+
     // require create permission (owner)
     if (!(await hasPermission('products.create'))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-
     const body = await request.json();
-    const { description, name, sku, category, costPrice, sellingPrice, currentStock, reorderLevel, unit, isActive, showOnStorefront } = body;
+    const { description, name, sku, category, costPrice, sellingPrice, currentStock, reorderLevel, unit, isActive, showOnStorefront, isService } = body;
 
-    if (!category || !name || !costPrice || !sellingPrice || !currentStock || !unit) {
+    const isServiceItem = Boolean(isService);
+
+    if (!category || !name || costPrice == null || sellingPrice == null || !unit || (!isServiceItem && currentStock == null)) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
     }
 
@@ -75,13 +85,24 @@ export async function POST(request: NextRequest) {
     const categoryRecord = await prisma.category.findFirst({
       where: { id: category, merchantId },
     });
+
+    const merchantRecord = await prisma.merchant.findUnique({
+      where: { id: merchantId },
+    });
+
+    if (!merchantRecord) {
+      return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
+    }
+    console.log('Category record:', categoryRecord);
+
     if (!categoryRecord) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 });
     }
+    console.log('merchantId at create:', JSON.stringify(merchantId), typeof merchantId);
 
     const product = await prisma.product.create({
-      data: { merchantId, description, name, categoryId: category, sku, costPrice, sellingPrice, currentStock, reorderLevel, unit, isActive, showOnStorefront },
-      select: { id: true, sku: true, name: true, costPrice: true, sellingPrice: true, currentStock: true, unit: true, isActive: true, showOnStorefront: true, createdAt: true },
+      data: { merchantId, description, name, categoryId: category, sku, costPrice, sellingPrice, currentStock, reorderLevel, unit, isActive, showOnStorefront, isService: isServiceItem },
+      select: { id: true, sku: true, name: true, costPrice: true, sellingPrice: true, currentStock: true, unit: true, isActive: true, showOnStorefront: true, isService: true, createdAt: true },
     });
 
     return NextResponse.json(product, { status: 201 });

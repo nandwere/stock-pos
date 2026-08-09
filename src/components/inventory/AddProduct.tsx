@@ -32,6 +32,7 @@ interface FormData {
   description: string;
   isActive: boolean;
   showOnStorefront: boolean;
+  isService: boolean;
 }
 
 const UNITS = ['pcs', 'kg', 'g', 'l', 'ml', 'm', 'cm', 'box', 'pack', 'bottle'];
@@ -65,7 +66,8 @@ export default function AddProductPage() {
     unit: product?.unit || 'pcs',
     description: product?.description || '',
     isActive: product?.isActive !== undefined ? product.isActive : true,
-    showOnStorefront: product?.showOnStorefront !== undefined ? product.showOnStorefront : true
+    showOnStorefront: product?.showOnStorefront !== undefined ? product.showOnStorefront : true,
+    isService: product?.isService !== undefined ? product.isService : false
   });
 
   const [showMarginWarning, setShowMarginWarning] = useState(false);
@@ -84,7 +86,8 @@ export default function AddProductPage() {
         unit: product?.unit || 'pcs',
         description: product?.description || '',
         isActive: product?.isActive !== undefined ? product.isActive : true,
-        showOnStorefront: product?.showOnStorefront !== undefined ? product.showOnStorefront : true
+        showOnStorefront: product?.showOnStorefront !== undefined ? product.showOnStorefront : true,
+        isService: product?.isService ?? false,
       }));
     }
 
@@ -115,7 +118,7 @@ export default function AddProductPage() {
       newErrors.category = 'Category is required';
     }
 
-    if (!formData.costPrice || parseFloat(formData.costPrice) <= 0) {
+    if (!formData.costPrice || parseFloat(formData.costPrice) < 0) {
       newErrors.costPrice = 'Valid cost price is required';
     }
 
@@ -127,12 +130,15 @@ export default function AddProductPage() {
       newErrors.sellingPrice = 'Selling price cannot be less than cost price';
     }
 
-    if (formData.currentStock === '' || parseFloat(formData.currentStock) < 0) {
-      newErrors.currentStock = 'Valid stock quantity is required';
-    }
-
-    if (!formData.reorderLevel || parseInt(formData.reorderLevel) < 0) {
-      newErrors.reorderLevel = 'Valid reorder level is required';
+    // Stock fields are meaningless for services — skip entirely rather than
+    // forcing the user to type a fake "999999" to get past validation
+    if (!formData.isService) {
+      if (formData.currentStock === '' || parseFloat(formData.currentStock) < 0) {
+        newErrors.currentStock = 'Valid stock quantity is required';
+      }
+      if (!formData.reorderLevel || parseInt(formData.reorderLevel) < 0) {
+        newErrors.reorderLevel = 'Valid reorder level is required';
+      }
     }
 
     if (!formData.unit) {
@@ -188,6 +194,7 @@ export default function AddProductPage() {
       isActive: formData.isActive,
       showOnStorefront: formData.showOnStorefront,
       updatedAt: new Date().toISOString(),
+      isService: formData.isService,
       ...(isNew ? { createdAt: new Date().toISOString() } : {}),
     };
 
@@ -387,6 +394,20 @@ export default function AddProductPage() {
                   )}
                 </div>
 
+                {/* Is Service toggle — put this right after the Category field in the Product Information card */}
+                <div className="md:col-span-2 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isService"
+                    checked={formData.isService}
+                    onChange={(e) => handleChange('isService', e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="isService" className="text-sm font-medium text-gray-700">
+                    This is a service, not a physical product (e.g. milling, repackaging) — no stock tracking
+                  </label>
+                </div>
+
                 {/* Description */}
                 <div className="md:col-span-2 space-y-2">
                   <label className="block text-sm font-medium text-gray-700">
@@ -490,51 +511,53 @@ export default function AddProductPage() {
                   </div>
                 </div>
 
-                {/* Current Stock */}
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Current Stock *
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step={'0.001'}
-                    value={formData.currentStock}
-                    onChange={(e) => handleChange('currentStock', e.target.value)}
-                    className={`w-full px-4 py-2 border text-gray-900 placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.currentStock ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    placeholder="0.000"
-                  />
-                  {errors.currentStock && (
-                    <p className="text-sm text-red-600 flex items-center gap-1">
-                      <AlertCircle className="w-4 h-4" />
-                      {errors.currentStock}
-                    </p>
-                  )}
-                </div>
+                {/* Current Stock — replace the existing block */}
+                {!formData.isService && (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Current Stock *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step={'0.001'}
+                      value={formData.currentStock}
+                      onChange={(e) => handleChange('currentStock', e.target.value)}
+                      className={`w-full px-4 py-2 border text-gray-900 placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.currentStock ? 'border-red-500' : 'border-gray-300'}`}
+                      placeholder="0.000"
+                    />
+                    {errors.currentStock && (
+                      <p className="text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-4 h-4" />
+                        {errors.currentStock}
+                      </p>
+                    )}
+                  </div>
+                )}
 
-                {/* Reorder Level */}
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Reorder Level *
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    value={formData.reorderLevel}
-                    onChange={(e) => handleChange('reorderLevel', e.target.value)}
-                    className={`w-full px-4 py-2 border text-gray-900 placeholder-gray-400  rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.reorderLevel ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    placeholder="5"
-                  />
-                  {errors.reorderLevel && (
-                    <p className="text-sm text-red-600 flex items-center gap-1">
-                      <AlertCircle className="w-4 h-4" />
-                      {errors.reorderLevel}
-                    </p>
-                  )}
-                </div>
+                {/* Reorder Level — same wrap */}
+                {!formData.isService && (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Reorder Level *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={formData.reorderLevel}
+                      onChange={(e) => handleChange('reorderLevel', e.target.value)}
+                      className={`w-full px-4 py-2 border text-gray-900 placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.reorderLevel ? 'border-red-500' : 'border-gray-300'}`}
+                      placeholder="5"
+                    />
+                    {errors.reorderLevel && (
+                      <p className="text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-4 h-4" />
+                        {errors.reorderLevel}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Unit */}
                 <div className="space-y-2">

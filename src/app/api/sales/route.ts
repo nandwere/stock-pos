@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     const products = await prisma.product.findMany({
       where: { id: { in: items.map((i: any) => i.productId) }, merchantId },
-      select: { id: true, name: true, costPrice: true },
+      select: { id: true, name: true, costPrice: true, isService: true },
     });
     const productById = new Map(products.map(p => [p.id, p]));
 
@@ -149,6 +149,7 @@ export async function POST(request: NextRequest) {
 
       for (const item of items) {
         const product = productById.get(item.productId)!;
+        if (product.isService) continue;
         const result = await tx.product.updateMany({
           where: { id: item.productId, merchantId, currentStock: { gte: item.quantity } },
           data: { currentStock: { decrement: item.quantity } },
