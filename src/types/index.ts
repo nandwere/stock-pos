@@ -65,6 +65,7 @@ export interface Product {
   id: string;
   merchantId: string;
   name: string;
+  description: string;
   sku: string;
   barcode?: string;
   categoryId: string;
@@ -79,6 +80,7 @@ export interface Product {
   isService: boolean;
   createdAt: Date;
   updatedAt: Date;
+  imageUrl: string | null;
 }
 
 export interface SaleItem {

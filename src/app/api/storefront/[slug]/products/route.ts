@@ -60,6 +60,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     orderBy: { name: 'asc' },
   });
 
+  console.log('products', products);
+
   const categories = await prisma.category.findMany({
     where: { merchantId: merchant.id },
     select: { id: true, name: true },

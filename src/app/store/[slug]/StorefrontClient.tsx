@@ -1,17 +1,7 @@
 'use client';
 
+import { Product } from '@/types';
 import { useEffect, useMemo, useState } from 'react';
-
-interface Product {
-  id: string;
-  name: string;
-  description: string | null;
-  sellingPrice: number;
-  currentStock: number;
-  unit: string;
-  categoryId: string;
-  imageUrl: string | null;
-}
 
 // Below this many units, show a "Only N left" warning. Above it, the exact
 // count isn't shown at all — most customers don't need to know there are
@@ -223,8 +213,8 @@ export function StorefrontClient({
       <div className="max-w-5xl mx-auto px-4 pb-24 grid grid-cols-2 md:grid-cols-3 gap-4">
         {filteredProducts.map((p) => {
           const inCart = cart.find((l) => l.productId === p.id);
-          const outOfStock = p.currentStock <= 0;
-          const lowStock = !outOfStock && p.currentStock <= LOW_STOCK_THRESHOLD;
+          const outOfStock = !p.isService && p.currentStock <= 0;
+          const lowStock = !p.isService && !outOfStock && p.currentStock <= LOW_STOCK_THRESHOLD;
 
           return (
             <div
