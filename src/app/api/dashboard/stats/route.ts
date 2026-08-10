@@ -15,14 +15,14 @@ export async function GET(request: NextRequest) {
     const user = await getCurrentUser();
 
     if (!user) {
-      console.warn("[Dashboard] Unauthorized access attempt");
+      // console.warn("[Dashboard] Unauthorized access attempt");
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    console.info(`[Dashboard] User authenticated: ${user.id}`);
+    // console.info(`[Dashboard] User authenticated: ${user.id}`);
 
     // Dates
     const today = new Date();
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 1);
 
     // Sales
-    console.info("[Dashboard] Fetching sales aggregates");
+    // console.info("[Dashboard] Fetching sales aggregates");
 
     const todaySales = await prisma.sale.aggregate({
       where: {
@@ -66,11 +66,11 @@ export async function GET(request: NextRequest) {
           ? 100
           : 0;
 
-    console.info("[Dashboard] Sales calculated", {
-      todayTotal,
-      yesterdayTotal,
-      salesChange,
-    });
+    // console.info("[Dashboard] Sales calculated", {
+    //   todayTotal,
+    //   yesterdayTotal,
+    //   salesChange,
+    // });
 
     // ── Daily profit ──────────────────────────────────────────────────────
     // SaleItem.costPrice is now snapshotted at sale-creation time, so this
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
     //
     // NOTE: this is gross margin on goods sold — it does NOT add/subtract
     // `tax` (tax isn't merchant revenue, correctly excluded).
-    console.info("[Dashboard] Fetching today's sale items for profit");
+    // console.info("[Dashboard] Fetching today's sale items for profit");
 
     const todaySaleItems = await prisma.saleItem.findMany({
       where: {
@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
           ? 100
           : 0;
 
-    console.info("[Dashboard] Profit calculated", { todayProfit, yesterdayProfit, profitChange });
+    // console.info("[Dashboard] Profit calculated", { todayProfit, yesterdayProfit, profitChange });
 
     // merchantId filter present here — a prior version of this query was
     // missing it and counted low-stock products across every merchant.

@@ -358,12 +358,12 @@ function ProductCard({ product, onAddToCart }: any) {
         </div>
         <div className="mt-auto">
           <div className="text-lg font-bold text-blue-600">
-            {formatCurrency(product.sellingPrice)}
+            {formatCurrency(product.sellingPrice)} / {product.unit}
           </div>
           <div className="text-xs text-gray-500 mt-1">
-            {Number(product.currentStock) === 0 ? (
+            {(Number(product.currentStock) === 0 && !product.isService) ? (
               <span className="text-red-600 font-medium">Out of Stock</span>
-            ) : Number(product.currentStock) <= Number(product.reorderLevel) ? (
+            ) : (Number(product.currentStock) <= Number(product.reorderLevel) && !product.isService) ? (
               <span className="text-orange-600 font-medium">
                 Low: {product.currentStock} {product.unit}
               </span>

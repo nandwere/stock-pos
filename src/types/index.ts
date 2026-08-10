@@ -75,6 +75,10 @@ export interface Product {
   reorderLevel: number;
   unit: string;
   isActive: boolean;
+  showOnStorefront: boolean;
+  isService: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface SaleItem {

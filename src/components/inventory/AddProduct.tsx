@@ -685,51 +685,53 @@ export default function AddProductPage() {
             </div>
 
             {/* Quick Stats */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Preview</h3>
+            {!formData.isService && (
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Preview</h3>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Product Value</span>
-                  <span className="font-medium text-gray-900">
-                    {formatCurrency(currentStockNum * costPrice)}
-                  </span>
-                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Product Value</span>
+                    <span className="font-medium text-gray-900">
+                      {formatCurrency(currentStockNum * costPrice)}
+                    </span>
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Stock Status</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${currentStockNum === 0
-                    ? 'bg-red-100 text-red-800'
-                    : currentStockNum <= reorderLevelNum
-                      ? 'bg-orange-100 text-orange-800'
-                      : 'bg-green-100 text-green-800'
-                    }`}>
-                    {currentStockNum === 0
-                      ? 'Out of Stock'
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Stock Status</span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${currentStockNum === 0
+                      ? 'bg-red-100 text-red-800'
                       : currentStockNum <= reorderLevelNum
-                        ? 'Low Stock'
-                        : 'In Stock'}
-                  </span>
-                </div>
+                        ? 'bg-orange-100 text-orange-800'
+                        : 'bg-green-100 text-green-800'
+                      }`}>
+                      {currentStockNum === 0
+                        ? 'Out of Stock'
+                        : currentStockNum <= reorderLevelNum
+                          ? 'Low Stock'
+                          : 'In Stock'}
+                    </span>
+                  </div>
 
-                <div className="pt-4 border-t border-gray-200">
-                  <div className="text-sm text-gray-600 mb-2">Stock Alert</div>
-                  <div className="text-sm text-gray-900">
-                    {currentStockNum <= reorderLevelNum ? (
-                      <div className="flex items-center gap-2 text-orange-600">
-                        <AlertCircle className="w-4 h-4" />
-                        Stock is at or below reorder level
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-green-600">
-                        <Info className="w-4 h-4" />
-                        Stock level is healthy
-                      </div>
-                    )}
+                  <div className="pt-4 border-t border-gray-200">
+                    <div className="text-sm text-gray-600 mb-2">Stock Alert</div>
+                    <div className="text-sm text-gray-900">
+                      {currentStockNum <= reorderLevelNum ? (
+                        <div className="flex items-center gap-2 text-orange-600">
+                          <AlertCircle className="w-4 h-4" />
+                          Stock is at or below reorder level
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-green-600">
+                          <Info className="w-4 h-4" />
+                          Stock level is healthy
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Help Card */}
             <div className="bg-blue-50 rounded-lg border border-blue-200 p-6">

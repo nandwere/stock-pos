@@ -218,11 +218,11 @@ export function InventoryList() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      {product.currentStock === 0 ? (
+                      {(product.currentStock === 0 && !product.isService) ? (
                         <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
                           Out of Stock
                         </span>
-                      ) : (Number(product.currentStock) || 0) <= (Number(product.reorderLevel) || 0)? (
+                      ) : ((Number(product.currentStock) || 0) <= (Number(product.reorderLevel) || 0) && !product.isService) ? (
                         <span className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
                           Low Stock
                         </span>

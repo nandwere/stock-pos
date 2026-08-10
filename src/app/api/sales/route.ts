@@ -208,8 +208,6 @@ export async function GET(request: NextRequest) {
     const endDate = url.searchParams.get('endDate');
     const productId = url.searchParams.get('productId');
 
-    console.log('Fetching sales with filters:', { q, paymentMethod, startDate, endDate, take, skip });
-
     const where: any = { merchantId };
     if (q) {
       where.OR = [
@@ -275,8 +273,6 @@ export async function GET(request: NextRequest) {
         : Promise.resolve(null),
     ]);
 
-    console.log(`Fetched ${sales.length} sales, total matching: ${total}`);
-
     return NextResponse.json({
       data: sales,
       meta: {
@@ -288,8 +284,8 @@ export async function GET(request: NextRequest) {
           ? (productItemAgg?._sum.subtotal ?? 0)
           : (revenueAgg._sum.total ?? 0),
         totalItemsSold: productId
-          ? (productItemAgg?._sum.quantity ?? 0)
-          : (itemsAgg._sum.quantity ?? 0),
+          ? (Number(productItemAgg?._sum.quantity) || 0)
+          : (Number(itemsAgg._sum.quantity) || 0),
       },
     });
   } catch (error) {

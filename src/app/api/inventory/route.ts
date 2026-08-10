@@ -101,8 +101,45 @@ export async function POST(request: NextRequest) {
     console.log('merchantId at create:', JSON.stringify(merchantId), typeof merchantId);
 
     const product = await prisma.product.create({
-      data: { merchantId, description, name, categoryId: category, sku, costPrice, sellingPrice, currentStock, reorderLevel, unit, isActive, showOnStorefront, isService: isServiceItem },
-      select: { id: true, sku: true, name: true, costPrice: true, sellingPrice: true, currentStock: true, unit: true, isActive: true, showOnStorefront: true, isService: true, createdAt: true },
+      data: {
+        name,
+        description,
+        sku,
+        costPrice,
+        sellingPrice,
+        currentStock: isServiceItem ? 0 : currentStock, // If it's a service item, set stock to 0
+        reorderLevel: isServiceItem ? 0 : reorderLevel, // If it's a service item, set reorder level to 0
+        unit,
+        isActive,
+        showOnStorefront,
+        isService: isServiceItem,
+
+        merchant: {
+          connect: {
+            id: merchantId,
+          },
+        },
+
+        category: {
+          connect: {
+            id: category,
+          },
+        },
+      },
+
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        costPrice: true,
+        sellingPrice: true,
+        currentStock: true,
+        unit: true,
+        isActive: true,
+        showOnStorefront: true,
+        isService: true,
+        createdAt: true,
+      },
     });
 
     return NextResponse.json(product, { status: 201 });
