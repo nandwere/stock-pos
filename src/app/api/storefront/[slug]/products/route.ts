@@ -31,8 +31,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     where: {
       merchantId: merchant.id,
       isActive: true,
-      currentStock: { gt: 0 },
       showOnStorefront: true,
+      // Services have no real stock count (currentStock is always 0 for
+      // them by convention), so the stock gate only applies to physical
+      // products. Without this OR, isService items never pass currentStock
+      // > 0 and silently vanish from the storefront.
+      OR: [
+        { isService: true },
+        { currentStock: { gt: 0 } },
+      ],
       ...(categoryId ? { categoryId } : {}),
       ...(search
         ? { name: { contains: search, mode: 'insensitive' } }
@@ -47,6 +54,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       unit: true,
       categoryId: true,
       showOnStorefront: true,
+      isService: true,
       category: { select: { id: true, name: true } },
     },
     orderBy: { name: 'asc' },
