@@ -13,6 +13,7 @@ interface CartItem {
   subtotal: number;
   currentStock: number;
   unit: string;
+  isService?: boolean; // Optional property to indicate if the item is a service
 }
 
 interface POSStore {
@@ -79,7 +80,8 @@ export const usePOSStore = create<POSStore>()(
                 sellingPrice: product.sellingPrice,
                 subtotal: product.sellingPrice,
                 currentStock: product.currentStock,
-                unit: product.unit
+                unit: product.unit,
+                isService: product.isService
               }
             ]
           });

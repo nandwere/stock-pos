@@ -380,7 +380,7 @@ function ProductCard({ product, onAddToCart }: any) {
 // Cart Item Card Component
 function CartItemCard({ item, onUpdateQuantity, onRemove }: any) {
   const handleQuantityChange = (newQty: number) => {
-    if (newQty > item.currentStock) {
+    if (newQty > item.currentStock && !item.isService) {
       alert(`Only ${item.currentStock} units available`);
       return;
     }
@@ -409,7 +409,7 @@ function CartItemCard({ item, onUpdateQuantity, onRemove }: any) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => handleQuantityChange(item.quantity - 0.250)}
+            onClick={() => handleQuantityChange(item.quantity - (item.isService ? 1 : 0.250))}
             className="w-7 h-7 rounded bg-gray-200 hover:bg-gray-300 flex items-center justify-center"
           >
             <Minus className="w-4 text-gray-900 h-4" />
@@ -423,7 +423,7 @@ function CartItemCard({ item, onUpdateQuantity, onRemove }: any) {
             max={item.currentStock}
           />
           <button
-            onClick={() => handleQuantityChange(item.quantity + 0.250)}
+            onClick={() => handleQuantityChange(item.quantity + ( item.isService ? 1 : 0.250 ))}
             className="w-7 h-7 rounded bg-gray-200 text-gray-900 hover:bg-gray-300 flex items-center justify-center"
           >
             <Plus className="w-4 h-4" />
