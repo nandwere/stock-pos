@@ -19,7 +19,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   try {
-    const sale = await prisma.$transaction(async (tx) => {
+    const sale = await prisma.$transaction(async (tx: { sale: { findFirst: (arg0: { where: { id: string; merchantId: string; }; select: { total: boolean; amountPaid: boolean; paymentMethod: boolean; }; }) => any; update: (arg0: { where: { id: string; }; data: { notifiedAt?: null | undefined; amountPaid: number; }; }) => any; }; }) => {
       // Lock-and-check in one round trip via the WHERE clause, same pattern
       // as the stock decrement: the update itself is the concurrency guard,
       // not a separate read-then-write. Two simultaneous partial payments
@@ -32,7 +32,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (!existing) {
         throw new NotFoundError();
       }
-      console.log(existing);
       if (existing.paymentMethod !== 'CREDIT') {
         throw new ValidationError('Only credit sales accept repayments');
       }

@@ -37,16 +37,17 @@ export async function GET(request: NextRequest) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const withBalance = sales.map((s) => ({
+  const withBalance = sales.map((s: { total: any; amountPaid: any; dueDate: any; }) => ({
     ...s,
     balance: Number(s.total) - Number(s.amountPaid),
     isOverdue: s.dueDate ? s.dueDate < today : false,
+    isSettled: Number(s.total) <= Number(s.amountPaid),
   }));
 
   const summary = {
     count: withBalance.length,
-    totalOutstanding: withBalance.reduce((sum, s) => sum + s.balance, 0),
-    overdueCount: withBalance.filter((s) => s.isOverdue).length,
+    totalOutstanding: withBalance.reduce((sum: number, s: { balance: number; }) => sum + s.balance, 0),
+    overdueCount: withBalance.filter((s: { isOverdue: boolean; }) => s.isOverdue).length,
   };
 
   return NextResponse.json({ sales: withBalance, summary });

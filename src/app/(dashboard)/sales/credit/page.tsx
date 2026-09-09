@@ -14,6 +14,7 @@ type CreditSale = {
   balance: number;
   dueDate: string | null;
   isOverdue: boolean;
+  isSettled: boolean;
   notifiedAt: string | null;
   createdAt: string;
 };
@@ -123,6 +124,8 @@ export default function CreditSalesPage() {
               </div>
               {s.isOverdue ? (
                 <span className="text-red-600 font-medium text-sm">Overdue</span>
+              ) : s.isSettled ? (
+                <span className="text-green-600 font-medium text-sm">Settled</span>
               ) : (
                 <span className="text-gray-500 text-sm">Pending</span>
               )}
