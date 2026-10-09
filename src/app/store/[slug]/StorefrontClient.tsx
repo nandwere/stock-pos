@@ -149,7 +149,7 @@ export function StorefrontClient({
           <div className="flex items-center gap-3">
             {store.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={store.logoUrl} alt={store.name} className="w-10 h-10 rounded-full object-cover" />
+              <img src={store.logoUrl} alt={store.name} className="w-10 h-10 rounded-full object-contain" />
             ) : (
               <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold">
                 {store.name.charAt(0)}
@@ -189,9 +189,8 @@ export function StorefrontClient({
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button
             onClick={() => setActiveCategory(null)}
-            className={`px-3 py-1 rounded-full text-sm whitespace-nowrap border ${
-              activeCategory === null ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white'
-            }`}
+            className={`px-3 py-1 rounded-full text-sm whitespace-nowrap border ${activeCategory === null ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white'
+              }`}
           >
             All
           </button>
@@ -199,9 +198,8 @@ export function StorefrontClient({
             <button
               key={c.id}
               onClick={() => setActiveCategory(c.id)}
-              className={`px-3 py-1 rounded-full text-sm whitespace-nowrap border ${
-                activeCategory === c.id ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white'
-              }`}
+              className={`px-3 py-1 rounded-full text-sm whitespace-nowrap border ${activeCategory === c.id ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white'
+                }`}
             >
               {c.name}
             </button>
@@ -221,10 +219,14 @@ export function StorefrontClient({
               key={p.id}
               className={`bg-white border rounded-xl overflow-hidden flex flex-col ${outOfStock ? 'opacity-60' : ''}`}
             >
-              <div className="aspect-square bg-gray-100 relative">
+              <div className="aspect-square bg-gray-100 relative overflow-hidden">
                 {p.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                  <img
+                    src={p.imageUrl}
+                    alt={p.name}
+                    className="absolute inset-0 w-full h-full object-contain"
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">📦</div>
                 )}
@@ -239,7 +241,7 @@ export function StorefrontClient({
                 <h3 className="font-semibold">{p.name}</h3>
                 {p.description && <p className="text-sm text-gray-500 line-clamp-2 mt-1">{p.description}</p>}
                 <div className="mt-auto pt-3 flex items-center justify-between">
-                  <span className="font-bold">{formatMoney(p.sellingPrice, store.currency)} per kg</span>
+                  <span className="font-bold">{formatMoney(p.sellingPrice, store.currency)} per {p.unit}</span>
                   {lowStock && (
                     <span className="text-xs text-amber-600 font-medium">
                       Only {p.currentStock} {p.unit} left
@@ -319,7 +321,7 @@ export function StorefrontClient({
                         <div>
                           <p className="font-medium">{product.name}</p>
                           <p className="text-sm text-gray-500">
-                            {formatMoney(product.sellingPrice, store.currency)} × {line.quantity}
+                            {formatMoney(product.sellingPrice, store.currency)} per {product.unit} × {line.quantity}
                           </p>
                         </div>
                       </div>
