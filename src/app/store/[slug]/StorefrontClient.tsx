@@ -19,6 +19,13 @@ interface Store {
   currency: string;
   tagline: string | null;
   deliveryFee: number;
+  phone: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  hours: string | null;
 }
 
 interface CartLine {
@@ -32,6 +39,18 @@ function cartStorageKey(slug: string) {
 
 function formatMoney(amount: number, currency: string) {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency, minimumFractionDigits: 0 }).format(amount);
+}
+
+function toWhatsappNumber(raw: string) {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('0')) return '254' + digits.slice(1);
+  return digits;
+}
+
+function mapQuery(store: Store) {
+  if (store.lat != null && store.lng != null) return `${store.lat},${store.lng}`;
+  if (store.address) return `${store.name} ${store.address}`;
+  return null;
 }
 
 export function StorefrontClient({
@@ -160,21 +179,23 @@ export function StorefrontClient({
               {store.tagline && <p className="text-sm text-gray-500">{store.tagline}</p>}
             </div>
           </div>
-
-          <button
-            onClick={() => {
-              setCartOpen(true);
-              setCheckoutStep('cart');
-            }}
-            className="relative bg-emerald-600 text-white px-4 py-2 rounded-full font-medium"
-          >
-            Cart
-            {cartCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-600 text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                {cartCount}
-              </span>
-            )}
-          </button>
+          <div>
+            <a href="#contact" className="text-sm text-gray-600 hidden sm:inline mr-3">Contact</a>
+            <button
+              onClick={() => {
+                setCartOpen(true);
+                setCheckoutStep('cart');
+              }}
+              className="relative bg-emerald-600 text-white px-4 py-2 rounded-full font-medium"
+            >
+              Cart
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-600 text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -287,6 +308,75 @@ export function StorefrontClient({
           <p className="col-span-full text-center text-gray-400 py-12">No products found.</p>
         )}
       </div>
+
+      {/* ── Contact & location ── */}
+      {(store.phone || store.whatsapp || store.email || store.address || mapQuery(store)) && (
+        <section id="contact" className="max-w-5xl mx-auto px-4 pb-24">
+          <h2 className="text-xl font-bold mb-4">Contact &amp; location</h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-white border rounded-xl p-5 space-y-3 text-sm">
+              {store.address && (
+                <p className="flex gap-2"><span>📍</span><span>{store.address}</span></p>
+              )}
+              {store.hours && (
+                <p className="flex gap-2"><span>🕒</span><span>{store.hours}</span></p>
+              )}
+              {store.phone && (
+                <p className="flex gap-2">
+                  <span>📞</span>
+                  <a href={`tel:${store.phone.replace(/\s/g, '')}`} className="text-emerald-700 font-medium">
+                    {store.phone}
+                  </a>
+                </p>
+              )}
+              {store.email && (
+                <p className="flex gap-2">
+                  <span>✉️</span>
+                  <a href={`mailto:${store.email}`} className="text-emerald-700 font-medium break-all">
+                    {store.email}
+                  </a>
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-2 pt-2">
+                {store.whatsapp && (
+                  <a
+                    href={`https://wa.me/${toWhatsappNumber(store.whatsapp)}?text=${encodeURIComponent(`Hi ${store.name}, I have a question about my order.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium"
+                  >
+                    Chat on WhatsApp
+                  </a>
+                )}
+                {mapQuery(store) && (
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapQuery(store)!)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="border px-4 py-2 rounded-lg font-medium"
+                  >
+                    Get directions
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {mapQuery(store) && (
+              <div className="rounded-xl overflow-hidden border bg-white min-h-[260px]">
+                <iframe
+                  title={`${store.name} location`}
+                  src={`https://www.google.com/maps?q=${encodeURIComponent(mapQuery(store)!)}&z=16&output=embed`}
+                  className="w-full h-full min-h-[260px] border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  allowFullScreen
+                />
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ── Cart / checkout drawer ── */}
       {cartOpen && (

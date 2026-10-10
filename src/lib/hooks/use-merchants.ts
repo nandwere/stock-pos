@@ -43,8 +43,12 @@ async function updateMerchant({ id, data }: { id: string; data: any }) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!response.ok) throw new Error('Failed to update merchant');
-  return response.json();
+
+  const body = await response.json().catch(() => null);   // a 500 may not return JSON
+  if (!response.ok) {
+    throw new Error(body?.error ?? 'Failed to update merchant');
+  }
+  return body;
 }
 
 async function deleteMerchant(id: string) {

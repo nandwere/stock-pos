@@ -18,6 +18,13 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
       storefrontTagline: true,
       deliveryFee: true,
       isActive: true,
+      storefrontPhone: true,
+      storefrontWhatsapp: true,
+      storefrontEmail: true,
+      storefrontAddress: true,
+      storefrontLat: true,
+      storefrontLng: true,
+      storefrontHours: true,
     },
   });
 
@@ -27,10 +34,12 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
 
   const [products, categories] = await Promise.all([
     prisma.product.findMany({
-      where: { merchantId: merchant.id, isActive: true, OR: [
-        { isService: true },
-        { currentStock: { gt: 0 } },
-      ], showOnStorefront: true },
+      where: {
+        merchantId: merchant.id, isActive: true, OR: [
+          { isService: true },
+          { currentStock: { gt: 0 } },
+        ], showOnStorefront: true
+      },
       select: {
         id: true,
         name: true,
@@ -47,15 +56,11 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
       orderBy: { name: 'asc' },
     }),
     prisma.category.findMany({
-      where: { merchantId: merchant.id},
+      where: { merchantId: merchant.id },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
   ]);
-
-
-  // console.log('Fetched products:', products); // Log the fetched products
-  // console.log('Fetched categories:', categories); // Log the fetched categories
 
   return (
     <StorefrontClient
@@ -66,6 +71,13 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
         currency: merchant.currency,
         tagline: merchant.storefrontTagline,
         deliveryFee: Number(merchant.deliveryFee),
+        phone: merchant.storefrontPhone,
+        whatsapp: merchant.storefrontWhatsapp,
+        email: merchant.storefrontEmail,
+        address: merchant.storefrontAddress,
+        lat: merchant.storefrontLat != null ? Number(merchant.storefrontLat) : null,
+        lng: merchant.storefrontLng != null ? Number(merchant.storefrontLng) : null,
+        hours: merchant.storefrontHours,
       }}
       categories={categories}
       products={products.map((p: any) => ({

@@ -12,39 +12,65 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 const STRING_FIELDS = ['name', 'slug', 'email', 'phone', 'address', 'currency', 'timezone', 'storefrontTagline'] as const;
+const NULLABLE_STRING_FIELDS = [
+  'storefrontPhone', 'storefrontWhatsapp', 'storefrontEmail', 'storefrontAddress', 'storefrontHours',
+] as const;
 const BOOLEAN_FIELDS = ['isActive', 'storefrontEnabled'] as const;
 const DECIMAL_FIELDS = ['deliveryFee'] as const;
+const COORD_FIELDS = ['storefrontLat', 'storefrontLng'] as const;
 const ENUM_FIELDS = ['plan'] as const;
 
-const EDITABLE_FIELDS = [...STRING_FIELDS, ...BOOLEAN_FIELDS, ...DECIMAL_FIELDS, ...ENUM_FIELDS] as const;
+const EDITABLE_FIELDS = [
+  ...STRING_FIELDS, ...NULLABLE_STRING_FIELDS, ...BOOLEAN_FIELDS,
+  ...DECIMAL_FIELDS, ...COORD_FIELDS, ...ENUM_FIELDS,
+] as const;
 
-/**
- * Request bodies are never pre-typed, regardless of what the frontend
- * intends to send — a native HTML checkbox posts "on"/undefined, not
- * true/false; a number input posts a string; JSON.stringify(true) is fine
- * but JSON.stringify of a FormData-derived object often isn't. Coerce
- * explicitly per field rather than trusting whatever shape arrived.
- */
+const PHONE_RE = /^\+?[0-9\s-]{9,15}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SLUG_RE = /^[a-z0-9-]+$/;
+const MAX_LEN: Record<string, number> = {
+  storefrontAddress: 200, storefrontHours: 120, storefrontEmail: 120, storefrontTagline: 160,
+};
+
 function coerceValue(field: (typeof EDITABLE_FIELDS)[number], raw: unknown): unknown {
   if ((BOOLEAN_FIELDS as readonly string[]).includes(field)) {
-    // Handles real booleans (true/false), the string forms of them, and
-    // the native-checkbox "on" value. Anything else (including "off",
-    // "", null, undefined) is false — checkboxes don't POST at all when
-    // unchecked, so absence must mean false, not "leave unchanged" (the
-    // caller only includes fields it actually means to set, per the
-    // `field in body` check below).
     return raw === true || raw === 'true' || raw === 'on';
   }
 
   if ((DECIMAL_FIELDS as readonly string[]).includes(field)) {
     const num = typeof raw === 'number' ? raw : parseFloat(String(raw));
-    if (Number.isNaN(num)) throw new Error(`${field} must be a number`);
+    if (Number.isNaN(num) || num < 0) throw new Error(`${field} must be a non-negative number`);
     return num;
   }
 
-  // Strings and the plan enum pass through as-is — Prisma validates the
-  // enum value itself and rejects anything not in MerchantPlan.
-  return raw;
+  if ((COORD_FIELDS as readonly string[]).includes(field)) {
+    if (raw === null || raw === '') return null;
+    const num = typeof raw === 'number' ? raw : parseFloat(String(raw));
+    const limit = field === 'storefrontLat' ? 90 : 180;
+    if (Number.isNaN(num) || Math.abs(num) > limit) throw new Error(`${field} is out of range`);
+    return Number(num.toFixed(6));          // column is Decimal(9,6)
+  }
+
+  if ((NULLABLE_STRING_FIELDS as readonly string[]).includes(field)) {
+    if (raw === null || raw === undefined) return null;
+    if (typeof raw !== 'string') throw new Error(`${field} must be text`);
+    const v = raw.trim();
+    if (v === '') return null;               // clearing a field removes it from the storefront
+    if (v.length > (MAX_LEN[field] ?? 200)) throw new Error(`${field} is too long`);
+    if ((field === 'storefrontPhone' || field === 'storefrontWhatsapp') && !PHONE_RE.test(v)) {
+      throw new Error(`${field} is not a valid phone number`);
+    }
+    if (field === 'storefrontEmail' && !EMAIL_RE.test(v)) throw new Error('storefrontEmail is not a valid email');
+    return v;
+  }
+
+  // Required strings and the plan enum
+  if (typeof raw !== 'string') throw new Error(`${field} must be text`);
+  const v = raw.trim();
+  if (['name', 'slug', 'email'].includes(field) && v === '') throw new Error(`${field} is required`);
+  if (field === 'slug' && !SLUG_RE.test(v)) throw new Error('slug may only contain lowercase letters, numbers and hyphens');
+  if (field === 'email' && !EMAIL_RE.test(v)) throw new Error('email is not valid');
+  return v;                                   // Prisma validates the plan enum itself
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -73,6 +99,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     for (const field of EDITABLE_FIELDS) {
       if (field in body) data[field] = coerceValue(field, body[field]);
     }
+    // Lat/lng must be set together or cleared together
+    const hasLat = 'storefrontLat' in data;
+    const hasLng = 'storefrontLng' in data;
+    if (hasLat !== hasLng || (hasLat && (data.storefrontLat === null) !== (data.storefrontLng === null))) {
+      return NextResponse.json({ error: 'Latitude and longitude must be provided together' }, { status: 400 });
+    }
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
@@ -84,7 +116,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Slug and email both have unique constraints — surface a clear error
   // instead of a generic 500 if the edit collides with another merchant.
   try {
-    const merchant = await prisma.merchant.update({ where: { id }, data });
+    const merchant = await prisma.merchant.update({
+      where: { id },
+      data,
+      include: { _count: { select: { users: true, products: true, sales: true } } },
+    });
     return NextResponse.json(merchant);
   } catch (err: any) {
     if (err.code === 'P2002') {

@@ -67,6 +67,13 @@ model Merchant {
   trialEndsAt DateTime?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  storefrontPhone     String?
+  storefrontWhatsapp  String?
+  storefrontEmail     String?
+  storefrontAddress   String?
+  storefrontLat       Decimal? @db.Decimal(9, 6)
+  storefrontLng       Decimal? @db.Decimal(9, 6)
+  storefrontHours     String?   // e.g. "Mon–Sat 8am–7pm"
 
   // Relations
   users             User[]

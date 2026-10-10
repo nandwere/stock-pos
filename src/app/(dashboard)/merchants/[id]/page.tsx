@@ -42,6 +42,19 @@ function Field({
   );
 }
 
+function parseCoords(raw: string): { lat: number; lng: number } | null | 'invalid' {
+  const s = raw.trim();
+  if (!s) return null; // empty is allowed → clears the map pin
+  const m = s.match(/^(-?\d{1,2}(?:\.\d+)?)\s*[,\s]\s*(-?\d{1,3}(?:\.\d+)?)$/);
+  if (!m) return 'invalid';
+  const lat = Number(m[1]);
+  const lng = Number(m[2]);
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return 'invalid';
+  return { lat, lng };
+}
+
+const PHONE_RE = /^\+?[0-9\s-]{9,15}$/;
+
 export default function MerchantEditPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -61,6 +74,12 @@ export default function MerchantEditPage() {
     deliveryFee: 0,
     storefrontEnabled: false,
     storefrontTagline: '',
+    storefrontPhone: '',
+    storefrontWhatsapp: '',
+    storefrontEmail: '',
+    storefrontAddress: '',
+    storefrontHours: '',
+    storefrontCoords: '',   // "lat, lng" as one pasteable string
   });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -81,6 +100,15 @@ export default function MerchantEditPage() {
       deliveryFee: merchant.deliveryFee ?? 0,
       storefrontEnabled: merchant.storefrontEnabled ?? false,
       storefrontTagline: merchant.storefrontTagline ?? '',
+      storefrontPhone: merchant.storefrontPhone ?? '',
+      storefrontWhatsapp: merchant.storefrontWhatsapp ?? '',
+      storefrontEmail: merchant.storefrontEmail ?? '',
+      storefrontAddress: merchant.storefrontAddress ?? '',
+      storefrontHours: merchant.storefrontHours ?? '',
+      storefrontCoords:
+        merchant.storefrontLat != null && merchant.storefrontLng != null
+          ? `${merchant.storefrontLat}, ${merchant.storefrontLng}`
+          : '',
     });
   }, [merchant]);
 
@@ -99,11 +127,32 @@ export default function MerchantEditPage() {
     e.preventDefault();
     setError('');
     setSaved(false);
+
+    const coords = parseCoords(form.storefrontCoords);
+    if (coords === 'invalid') {
+      return setError('Map coordinates must look like "-1.286389, 36.817223".');
+    }
+    for (const [label, v] of [['Public phone', form.storefrontPhone], ['WhatsApp number', form.storefrontWhatsapp]] as const) {
+      if (v && !PHONE_RE.test(v.trim())) return setError(`${label} doesn't look like a valid phone number.`);
+    }
+
+    const orNull = (s: string) => (s.trim() === '' ? null : s.trim());
+
+    const { storefrontCoords, ...rest } = form;
+    const payload = {
+      ...rest,
+      deliveryFee: Number(form.deliveryFee) || 0,      // see note below
+      storefrontPhone: orNull(form.storefrontPhone),
+      storefrontWhatsapp: orNull(form.storefrontWhatsapp),
+      storefrontEmail: orNull(form.storefrontEmail),
+      storefrontAddress: orNull(form.storefrontAddress),
+      storefrontHours: orNull(form.storefrontHours),
+      storefrontLat: coords ? coords.lat : null,
+      storefrontLng: coords ? coords.lng : null,
+    };
+
     try {
-      await update.mutateAsync({
-        id, ...form,
-        data: { id, ...form },
-      });
+      await update.mutateAsync({ id, data: payload });
       setSaved(true);
     } catch (err: any) {
       setError(err.message ?? 'Could not save changes');
@@ -299,6 +348,45 @@ export default function MerchantEditPage() {
           <div>
             <Field label="Storefront tagline">
               <input value={form.storefrontTagline} onChange={set('storefrontTagline')} className={inputCls} />
+            </Field>
+          </div>
+        </div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-2">
+          Storefront contact &amp; location
+        </p>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Public phone" hint="shown on the storefront">
+            <input type="tel" value={form.storefrontPhone} onChange={set('storefrontPhone')}
+              placeholder="0712 345 678" className={inputCls} />
+          </Field>
+
+          <Field label="WhatsApp number" hint="optional">
+            <input type="tel" value={form.storefrontWhatsapp} onChange={set('storefrontWhatsapp')}
+              placeholder="0712 345 678" className={inputCls} />
+          </Field>
+
+          <Field label="Public email">
+            <input type="email" value={form.storefrontEmail} onChange={set('storefrontEmail')}
+              placeholder="orders@shop.co.ke" className={inputCls} />
+          </Field>
+
+          <Field label="Opening hours">
+            <input value={form.storefrontHours} onChange={set('storefrontHours')}
+              placeholder="Mon–Sat 8am–7pm" maxLength={120} className={inputCls} />
+          </Field>
+
+          <div className="col-span-2">
+            <Field label="Shop address" hint="used for the map if no coordinates are set">
+              <input value={form.storefrontAddress} onChange={set('storefrontAddress')}
+                maxLength={200} className={inputCls} />
+            </Field>
+          </div>
+
+          <div className="col-span-2">
+            <Field label="Map coordinates" hint="in Google Maps, right-click the shop and click the numbers to copy">
+              <input value={form.storefrontCoords} onChange={set('storefrontCoords')}
+                placeholder="-1.286389, 36.817223" className={inputCls} />
             </Field>
           </div>
         </div>
