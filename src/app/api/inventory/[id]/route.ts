@@ -84,7 +84,7 @@ export async function PUT(
       }
     });
 
-    const updated = await prisma.$transaction(async (tx: { product: { findFirst: (arg0: { where: { id: string; merchantId: string; }; select: { costPrice: boolean; sellingPrice: boolean; currentStock: boolean; isService: boolean; }; }) => any; update: (arg0: { where: { id: string; }; data: any; }) => any; findUniqueOrThrow: (arg0: { where: { id: string; }; }) => any; }; }) => {
+    const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const before = await tx.product.findFirst({
         where: { id, merchantId },
         select: { costPrice: true, sellingPrice: true, currentStock: true, isService: true },
