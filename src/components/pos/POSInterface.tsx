@@ -13,8 +13,12 @@ import {
   Smartphone,
   Receipt,
   X,
-  Loader2
+  Loader2,
+  FileText,
+  Save
 } from 'lucide-react';
+import { useDraftSales, useSaveDraft, useDeleteDraft } from '@/lib/hooks/use-draft-sales';
+
 import { usePOSStore } from '@/lib/stores/pos-store';
 import { useProducts } from '@/lib/hooks/use-products';
 import { useCreateSale } from '@/lib/hooks/use-sales';
@@ -25,6 +29,7 @@ export function POSInterface() {
   const [showCart, setShowCart] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [completedSale, setCompletedSale] = useState<{ id: string; saleNumber: string; total: number } | null>(null);
 
   // Zustand store
   const cart = usePOSStore(state => state.cart);
@@ -33,6 +38,14 @@ export function POSInterface() {
   const updateQuantity = usePOSStore(state => state.updateQuantity);
   const clearCart = usePOSStore(state => state.clearCart);
   const getCartTotal = usePOSStore(state => state.getCartTotal);
+
+  const [showDrafts, setShowDrafts] = useState(false);
+  const [showSaveDraft, setShowSaveDraft] = useState(false);
+  const draftId = usePOSStore(state => state.draftId);
+  const loadDraft = usePOSStore(state => state.loadDraft);
+  const { data: drafts = [] } = useDraftSales();
+  const saveDraft = useSaveDraft();
+  const deleteDraft = useDeleteDraft();
 
   // React Query
   const { data: products = [], isLoading, error } = useProducts({
@@ -55,6 +68,40 @@ export function POSInterface() {
 
   const totals = getCartTotal();
 
+  const cartPayload = () =>
+    cart.map(item => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      unitPrice: Number(item.unitPrice),
+    }));
+
+  const handleSaveDraft = async (meta: { customerName?: string; notes?: string }) => {
+    try {
+      await saveDraft.mutateAsync({ id: draftId ?? undefined, items: cartPayload(), ...meta });
+      setShowSaveDraft(false);
+      setShowCart(false);
+      clearCart();
+    } catch (e: any) {
+      alert(e.message || 'Failed to save draft');
+    }
+  };
+
+  const handleResumeDraft = (draft: any) => {
+    if (cart.length > 0 && !confirm('Replace the current cart with this draft?')) return;
+    loadDraft(draft);
+    setShowDrafts(false);
+  };
+
+  const handleDeleteDraft = async (id: string) => {
+    if (!confirm('Delete this draft?')) return;
+    try {
+      await deleteDraft.mutateAsync(id);
+      if (id === draftId) clearCart();
+    } catch (e: any) {
+      alert(e.message || 'Failed to delete draft');
+    }
+  };
+
   const handleCompleteSale = async (paymentData: any) => {
     try {
       const saleData = {
@@ -68,14 +115,14 @@ export function POSInterface() {
         customerName: paymentData.customerName,
         discount: totals.discount,
         tax: totals.tax,
+        draftId: draftId ?? undefined,
       };
 
-      await createSale.mutateAsync(saleData);
+      // Show success message
+      const sale = await createSale.mutateAsync(saleData);
       setShowPaymentModal(false);
       clearCart();
-
-      // Show success message
-      alert('Sale completed successfully!');
+      setCompletedSale({ id: sale.id, saleNumber: sale.saleNumber, total: Number(sale.total) });
     } catch (error) {
       console.error('Sale failed:', error);
       alert('Failed to complete sale. Please try again.');
@@ -109,6 +156,18 @@ export function POSInterface() {
               </button>
             )}
           </div>
+          <button
+            onClick={() => setShowDrafts(true)}
+            className="relative flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+          >
+            <FileText className="w-5 h-5" />
+            <span className="hidden sm:inline">Drafts</span>
+            {drafts.length > 0 && (
+              <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {drafts.length}
+              </span>
+            )}
+          </button>
           {/* 👇 Live result count feedback */}
           {searchQuery.trim() && (
             <p className="text-xs text-gray-500 mt-2 pl-1">
@@ -235,6 +294,14 @@ export function POSInterface() {
                 </>
               )}
             </button>
+            <button
+              onClick={() => setShowSaveDraft(true)}
+              disabled={createSale.isPending || saveDraft.isPending}
+              className="w-full mt-2 border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Save className="w-5 h-5" />
+              {draftId ? 'Update Draft' : 'Save as Draft'}
+            </button>
           </div>
         )}
       </div>
@@ -322,9 +389,44 @@ export function POSInterface() {
                       </>
                     )}
                   </button>
+                  <button
+                    onClick={() => setShowSaveDraft(true)}
+                    disabled={createSale.isPending || saveDraft.isPending}
+                    className="w-full mt-2 border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <Save className="w-5 h-5" />
+                    {draftId ? 'Update Draft' : 'Save as Draft'}
+                  </button>
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {completedSale && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center text-gray-900">
+            <div className="text-green-600 text-lg font-bold mb-1">Sale completed</div>
+            <div className="text-sm text-gray-500">{completedSale.saleNumber}</div>
+            <div className="text-3xl font-bold my-3">{formatCurrency(completedSale.total)}</div>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <button
+                onClick={() => window.open(`/receipt/${completedSale.id}?autoprint=1`, 'receipt', 'width=420,height=720')}
+                className="py-3 bg-blue-600 text-white rounded-lg font-semibold"
+              >
+                Print receipt
+              </button>
+              <a
+                href={`/api/sales/${completedSale.id}/receipt/pdf`}
+                className="py-3 border rounded-lg font-semibold flex items-center justify-center"
+              >
+                PDF
+              </a>
+            </div>
+            <button onClick={() => setCompletedSale(null)} className="w-full py-3 text-gray-600">
+              New sale
+            </button>
           </div>
         </div>
       )}
@@ -335,6 +437,21 @@ export function POSInterface() {
           total={totals.total}
           onClose={() => setShowPaymentModal(false)}
           onComplete={handleCompleteSale}
+        />
+      )}
+      {showSaveDraft && (
+        <SaveDraftModal
+          saving={saveDraft.isPending}
+          onClose={() => setShowSaveDraft(false)}
+          onSave={handleSaveDraft}
+        />
+      )}
+      {showDrafts && (
+        <DraftsModal
+          drafts={drafts}
+          onClose={() => setShowDrafts(false)}
+          onResume={handleResumeDraft}
+          onDelete={handleDeleteDraft}
         />
       )}
     </div>
@@ -423,7 +540,7 @@ function CartItemCard({ item, onUpdateQuantity, onRemove }: any) {
             max={item.currentStock}
           />
           <button
-            onClick={() => handleQuantityChange(item.quantity + ( item.isService ? 1 : 0.250 ))}
+            onClick={() => handleQuantityChange(item.quantity + (item.isService ? 1 : 0.250))}
             className="w-7 h-7 rounded bg-gray-200 text-gray-900 hover:bg-gray-300 flex items-center justify-center"
           >
             <Plus className="w-4 h-4" />
@@ -458,7 +575,7 @@ function PaymentModal({ total, onClose, onComplete }: any) {
     : parseFloat(amountPaid || '0') >= total;
 
   const change = Math.max(0, parseFloat(amountPaid || '0') - total);
-    const canComplete = amountValid && creditFieldsValid && !submitting;
+  const canComplete = amountValid && creditFieldsValid && !submitting;
 
   const handleComplete = async () => {
     // Hard-block any second invocation while the first is in-flight
@@ -656,6 +773,93 @@ function PaymentModal({ total, onClose, onComplete }: any) {
               </>
             )}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SaveDraftModal({ onClose, onSave, saving }: any) {
+  const [customerName, setCustomerName] = useState('');
+  const [notes, setNotes] = useState('');
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md text-gray-900">
+        <div className="p-6 border-b flex items-center justify-between">
+          <h2 className="text-xl font-bold">Save as Draft</h2>
+          <button onClick={onClose} disabled={saving}><X className="w-6 h-6" /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <input
+            value={customerName}
+            onChange={e => setCustomerName(e.target.value)}
+            placeholder="Customer name or label (optional)"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+          />
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Notes (optional)"
+            rows={3}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+          />
+          <p className="text-xs text-gray-500">Drafts don't reserve or deduct stock.</p>
+        </div>
+        <div className="p-6 border-t flex gap-3">
+          <button onClick={onClose} disabled={saving}
+            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-semibold">Cancel</button>
+          <button
+            onClick={() => onSave({ customerName: customerName || undefined, notes: notes || undefined })}
+            disabled={saving}
+            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold disabled:bg-gray-300"
+          >
+            {saving ? 'Saving…' : 'Save Draft'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DraftsModal({ drafts, onClose, onResume, onDelete }: any) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col text-gray-900">
+        <div className="p-6 border-b flex items-center justify-between">
+          <h2 className="text-xl font-bold">Draft Sales ({drafts.length})</h2>
+          <button onClick={onClose}><X className="w-6 h-6" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {drafts.length === 0 ? (
+            <p className="text-center text-gray-500 py-8">No drafts saved</p>
+          ) : (
+            drafts.map((d: any) => (
+              <div key={d.id} className="border border-gray-200 rounded-lg p-3">
+                <div className="flex justify-between items-start">
+                  <div className="min-w-0">
+                    <div className="font-semibold truncate">{d.customerName || d.draftNumber}</div>
+                    <div className="text-xs text-gray-500">
+                      {d.items.length} item{d.items.length !== 1 ? 's' : ''} ·{' '}
+                      {new Date(d.updatedAt).toLocaleString()} · {d.user?.name}
+                    </div>
+                    {d.notes && <div className="text-xs text-gray-600 mt-1 line-clamp-2">{d.notes}</div>}
+                  </div>
+                  <div className="font-bold text-blue-600 pl-2">{formatCurrency(Number(d.total))}</div>
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button onClick={() => onResume(d)}
+                    className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
+                    Resume
+                  </button>
+                  <button onClick={() => onDelete(d.id)}
+                    className="px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

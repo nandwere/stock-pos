@@ -1,77 +1,106 @@
-// app/api/sales/[id]/repay/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma, PaymentMethod } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getCurrentUser, getSession } from '@/lib/auth';
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const { merchantId } = session;
-  const { id } = await params;
+type Ctx = { params: Promise<{ id: string }> }; // Next 14: { params: { id: string } }, no await
 
-  const body = await request.json();
-  const amount = body.amount;
-
-  if (typeof amount !== 'number' || amount <= 0) {
-    return NextResponse.json({ error: 'amount must be a positive number' }, { status: 400 });
-  }
-
-  try {
-    const sale = await prisma.$transaction(async (tx: { sale: { findFirst: (arg0: { where: { id: string; merchantId: string; }; select: { total: boolean; amountPaid: boolean; paymentMethod: boolean; }; }) => any; update: (arg0: { where: { id: string; }; data: { notifiedAt?: null | undefined; amountPaid: number; }; }) => any; }; }) => {
-      // Lock-and-check in one round trip via the WHERE clause, same pattern
-      // as the stock decrement: the update itself is the concurrency guard,
-      // not a separate read-then-write. Two simultaneous partial payments
-      // for the same sale can't both push amountPaid past total.
-      const existing = await tx.sale.findFirst({
-        where: { id: id, merchantId },
-        select: { total: true, amountPaid: true, paymentMethod: true },
-      });
-
-      if (!existing) {
-        throw new NotFoundError();
-      }
-      if (existing.paymentMethod !== 'CREDIT') {
-        throw new ValidationError('Only credit sales accept repayments');
-      }
-
-      const currentBalance = Number(existing.total) - Number(existing.amountPaid);
-      if (amount > currentBalance) {
-        throw new ValidationError(`Payment (${amount}) exceeds outstanding balance (${currentBalance})`);
-      }
-
-      const newAmountPaid = Number(existing.amountPaid) + amount;
-      const fullySettled = newAmountPaid >= Number(existing.total);
-
-      const updated = await tx.sale.update({
-        where: { id: id },
-        data: {
-          amountPaid: newAmountPaid,
-          // Once fully settled there's nothing left to remind anyone about —
-          // clearing notifiedAt here isn't for the cron's sake (the balance
-          // filter already excludes settled sales) but keeps the field
-          // meaningful if you ever add a "reopen sale" / refund path later,
-          // rather than leaving a stale timestamp on a closed account.
-          ...(fullySettled && { notifiedAt: null }),
-        },
-      });
-
-      return updated;
-    });
-
-    return NextResponse.json(sale);
-  } catch (error: any) {
-    if (error instanceof NotFoundError) {
-      return NextResponse.json({ error: 'Sale not found' }, { status: 404 });
-    }
-    if (error instanceof ValidationError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-    console.error('Repayment error:', error);
-    return NextResponse.json({ error: 'Failed to record payment' }, { status: 500 });
+class RepayError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
   }
 }
 
-class NotFoundError extends Error {}
-class ValidationError extends Error {}
+const REPAY_METHODS: PaymentMethod[] = [
+  PaymentMethod.CASH,
+  PaymentMethod.CARD,
+  PaymentMethod.MOBILE_MONEY,
+];
+
+export async function PATCH(request: NextRequest, { params }: Ctx) {
+  try {
+    const session = await getSession();
+    const user = await getCurrentUser();
+    if (!session || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { merchantId } = session;
+    const { id } = await params;
+
+    const body = await request.json();
+    const rawAmount = Number(body.amount);
+    const method: PaymentMethod = body.method ?? PaymentMethod.CASH;
+    const reference = typeof body.reference === 'string' ? body.reference.trim().toUpperCase() : '';
+    const notes = typeof body.notes === 'string' ? body.notes.trim() : '';
+
+    if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+      return NextResponse.json({ error: 'amount must be a positive number' }, { status: 400 });
+    }
+    if (!REPAY_METHODS.includes(method)) {
+      return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 });
+    }
+    const amount = new Prisma.Decimal(rawAmount);
+
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // Lock the sale row so two cashiers paying at once can't overpay.
+        // (Table/column names are Prisma defaults; adjust if you use @@map.)
+        await tx.$queryRaw`SELECT id FROM "Sale" WHERE id = ${id} AND "merchantId" = ${merchantId} FOR UPDATE`;
+
+        const sale = await tx.sale.findFirst({ where: { id, merchantId } });
+        if (!sale) throw new RepayError(404, 'Sale not found');
+        if (sale.paymentMethod !== PaymentMethod.CREDIT) {
+          throw new RepayError(400, 'Only credit sales can take repayments');
+        }
+
+        const balance = sale.total.minus(sale.amountPaid);
+        if (balance.lte(0)) throw new RepayError(409, 'This sale is already fully paid');
+        if (amount.gt(balance)) {
+          throw new RepayError(400, `Amount exceeds outstanding balance of ${balance.toFixed(2)}`);
+        }
+
+        const newPaid = sale.amountPaid.plus(amount);
+        const newBalance = sale.total.minus(newPaid);
+
+        const payment = await tx.salePayment.create({
+          data: {
+            merchantId,
+            saleId: id,
+            userId: user.id,
+            kind: 'REPAYMENT',
+            method,
+            amount,
+            balanceAfter: newBalance,
+            reference: reference || null,
+            notes: notes || null,
+          },
+        });
+
+        const updated = await tx.sale.update({
+          where: { id },
+          data: {
+            amountPaid: newPaid,
+            settledAt: newBalance.lte(0) ? new Date() : null,
+          },
+          select: { id: true, total: true, amountPaid: true, settledAt: true },
+        });
+
+        return { payment, sale: updated, balance: newBalance };
+      },
+      { maxWait: 10000, timeout: 15000 }
+    );
+
+    return NextResponse.json({
+      payment: { ...result.payment, amount: Number(result.payment.amount), balanceAfter: Number(result.payment.balanceAfter) },
+      sale: { id: result.sale.id, total: Number(result.sale.total), amountPaid: Number(result.sale.amountPaid), settledAt: result.sale.settledAt },
+      balance: Number(result.balance),
+    });
+  } catch (error: any) {
+    if (error instanceof RepayError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error?.code === 'P2002') {
+      return NextResponse.json({ error: 'This payment reference has already been recorded' }, { status: 409 });
+    }
+    console.error('Repay error:', error);
+    return NextResponse.json({ error: 'Failed to record payment' }, { status: 500 });
+  }
+}

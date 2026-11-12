@@ -23,7 +23,7 @@ interface FormData {
   name: string;
   sku: string;
   barcode: string;
-  category: string;
+  categoryId: string;
   costPrice: string;
   sellingPrice: string;
   currentStock: string;
@@ -58,7 +58,7 @@ export default function AddProductPage() {
     name: product?.name || '',
     sku: product?.sku || '',
     barcode: product?.barcode || '',
-    category: product?.category?.id || '',
+    categoryId: product?.category?.id || '',
     costPrice: product?.costPrice?.toString() || '',
     sellingPrice: product?.sellingPrice?.toString() || '',
     currentStock: product?.currentStock?.toString() || '',
@@ -78,7 +78,7 @@ export default function AddProductPage() {
         name: product.name,
         sku: product?.sku,
         barcode: product?.barcode,
-        category: product?.category?.id,
+        categoryId: product?.category?.id,
         costPrice: product?.costPrice?.toString() || '',
         sellingPrice: product?.sellingPrice?.toString() || '',
         currentStock: product?.currentStock?.toString() || '',
@@ -114,8 +114,8 @@ export default function AddProductPage() {
     if (!formData.name.trim()) {
       newErrors.name = 'Product name is required';
     }
-    if (!formData.category) {
-      newErrors.category = 'Category is required';
+    if (!formData.categoryId) {
+      newErrors.categoryId = 'Category is required';
     }
 
     if (!formData.costPrice || parseFloat(formData.costPrice) < 0) {
@@ -184,7 +184,7 @@ export default function AddProductPage() {
       name: formData.name,
       sku: formData.sku,
       barcode: formData.barcode || undefined,
-      category: formData.category,
+      categoryId: formData.categoryId,
       costPrice: parseFloat(formData.costPrice),
       sellingPrice: parseFloat(formData.sellingPrice),
       currentStock: parseFloat(formData.currentStock),
@@ -251,7 +251,7 @@ export default function AddProductPage() {
   };
 
   const generateSku = () => {
-    const prefix = formData.category.slice(0, 3).toUpperCase() || 'PRO';
+    const prefix = formData.categoryId.slice(0, 3).toUpperCase() || 'PRO';
     const random = Math.floor(1000 + Math.random() * 9000);
     const sku = `${prefix}-${random}`;
     handleChange('sku', sku);
@@ -376,9 +376,9 @@ export default function AddProductPage() {
                     Category *
                   </label>
                   <select
-                    value={formData.category}
-                    onChange={(e) => handleChange('category', e.target.value)}
-                    className={`w-full px-4 py-2 border text-gray-900 placeholder-gray-400  rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.category ? 'border-red-500' : 'border-gray-300'
+                    value={formData.categoryId}
+                    onChange={(e) => handleChange('categoryId', e.target.value)}
+                    className={`w-full px-4 py-2 border text-gray-900 placeholder-gray-400  rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.categoryId ? 'border-red-500' : 'border-gray-300'
                       }`}
                   >
                     <option value="">Select a category</option>
@@ -386,10 +386,10 @@ export default function AddProductPage() {
                       <option key={category.id} value={category.id}>{category.name}</option>
                     ))}
                   </select>
-                  {errors.category && (
+                  {errors.categoryId && (
                     <p className="text-sm text-red-600 flex items-center gap-1">
                       <AlertCircle className="w-4 h-4" />
-                      {errors.category}
+                      {errors.categoryId}
                     </p>
                   )}
                 </div>

@@ -21,7 +21,9 @@ interface POSStore {
   discount: number;
   tax: number;
   customerName: string;
-  
+  draftId: string | null;
+  loadDraft: (draft: any) => void;
+
   // Actions
   addToCart: (product: any) => void;
   removeFromCart: (productId: string) => void;
@@ -30,7 +32,7 @@ interface POSStore {
   setDiscount: (discount: number) => void;
   setTax: (tax: number) => void;
   setCustomerName: (name: string) => void;
-  
+
   // Computed
   getCartTotal: () => {
     subtotal: number;
@@ -47,7 +49,23 @@ export const usePOSStore = create<POSStore>()(
       discount: 0,
       tax: 0,
       customerName: '',
-
+      draftId: null,
+      loadDraft: (draft) =>
+        set({
+          draftId: draft.id,
+          cart: draft.items.map((i: any) => ({
+            id: i.productId,              // match whatever addToCart uses for `id`
+            productId: i.productId,
+            name: i.product.name,
+            sku: i.product.sku,
+            unit: i.product.unit,
+            isService: i.product.isService,
+            currentStock: Number(i.product.currentStock), // fresh stock, not a snapshot
+            unitPrice: Number(i.unitPrice),               // the price agreed when drafted
+            quantity: Number(i.quantity),
+            subtotal: Number(i.quantity) * Number(i.unitPrice),
+          })),
+        }),
       addToCart: (product) => {
         const { cart } = get();
         const existingItem = cart.find(item => item.productId === product.id);
@@ -58,10 +76,10 @@ export const usePOSStore = create<POSStore>()(
             cart: cart.map(item =>
               item.productId === product.id
                 ? {
-                    ...item,
-                    quantity: item.quantity + 1,
-                    subtotal: (item.quantity + 1) * item.unitPrice
-                  }
+                  ...item,
+                  quantity: item.quantity + 1,
+                  subtotal: (item.quantity + 1) * item.unitPrice
+                }
                 : item
             )
           });
@@ -104,10 +122,10 @@ export const usePOSStore = create<POSStore>()(
           cart: state.cart.map(item =>
             item.productId === productId
               ? {
-                  ...item,
-                  quantity,
-                  subtotal: quantity * item.unitPrice
-                }
+                ...item,
+                quantity,
+                subtotal: quantity * item.unitPrice
+              }
               : item
           )
         }));
@@ -118,7 +136,8 @@ export const usePOSStore = create<POSStore>()(
           cart: [],
           discount: 0,
           tax: 0,
-          customerName: ''
+          customerName: '',
+          draftId: null
         });
       },
 
@@ -127,7 +146,7 @@ export const usePOSStore = create<POSStore>()(
       setCustomerName: (customerName) => set({ customerName }),
 
       getCartTotal: () => {
-        const { cart, discount, tax } = get();        
+        const { cart, discount, tax } = get();
         const subtotal = cart.reduce((sum, item) => sum + Number(item.subtotal), 0);
         const taxAmount = subtotal * (tax / 100);
         const total = subtotal + taxAmount - discount;

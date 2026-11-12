@@ -1,7 +1,8 @@
 // src/app/api/inventory/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession, hasPermission } from '@/lib/auth';
+import { getSession, hasPermission, getCurrentUser } from '@/lib/auth';
+import { recordPriceChange } from '@/lib/stock-history';
 
 export async function GET(request: NextRequest) {
   try {
@@ -93,55 +94,58 @@ export async function POST(request: NextRequest) {
     if (!merchantRecord) {
       return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
     }
-    console.log('Category record:', categoryRecord);
 
     if (!categoryRecord) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 });
     }
-    console.log('merchantId at create:', JSON.stringify(merchantId), typeof merchantId);
 
-    const product = await prisma.product.create({
-      data: {
-        name,
-        description,
-        sku,
-        costPrice,
-        sellingPrice,
-        currentStock: isServiceItem ? 0 : currentStock, // If it's a service item, set stock to 0
-        reorderLevel: isServiceItem ? 0 : reorderLevel, // If it's a service item, set reorder level to 0
-        unit,
-        isActive,
-        showOnStorefront,
-        isService: isServiceItem,
+    const user = await getCurrentUser();
 
-        merchant: {
-          connect: {
-            id: merchantId,
-          },
+    const product = await prisma.$transaction(async (tx: any) => {
+      const created = await tx.product.create({
+        data: {
+          name, description, sku, costPrice, sellingPrice,
+          currentStock: isServiceItem ? 0 : currentStock,
+          reorderLevel: isServiceItem ? 0 : reorderLevel,
+          unit, isActive, showOnStorefront, isService: isServiceItem,
+          merchant: { connect: { id: merchantId } },
+          category: { connect: { id: category } },
         },
-
-        category: {
-          connect: {
-            id: category,
-          },
+        select: {
+          id: true, sku: true, name: true, costPrice: true, sellingPrice: true,
+          currentStock: true, unit: true, isActive: true, showOnStorefront: true,
+          isService: true, createdAt: true,
         },
-      },
+      });
 
-      select: {
-        id: true,
-        sku: true,
-        name: true,
-        costPrice: true,
-        sellingPrice: true,
-        currentStock: true,
-        unit: true,
-        isActive: true,
-        showOnStorefront: true,
-        isService: true,
-        createdAt: true,
-      },
+      // Opening balance (the product was created with this stock, so we write
+      // the ledger row directly instead of going through applyStockChange)
+      if (!isServiceItem && Number(currentStock) > 0) {
+        await tx.stockMovement.create({
+          data: {
+            merchantId,
+            productId: created.id,
+            userId: user?.id ?? null,
+            type: 'OPENING',
+            quantityChange: currentStock,
+            stockBefore: 0,
+            stockAfter: currentStock,
+            note: 'Initial stock on product creation',
+          },
+        });
+      }
+
+      await recordPriceChange(tx, {
+        merchantId,
+        productId: created.id,
+        userId: user?.id,
+        before: null,
+        after: { costPrice, sellingPrice },
+        reason: 'Initial price',
+      });
+
+      return created;
     });
-
     return NextResponse.json(product, { status: 201 });
   } catch (error: any) {
     // SKU collision is unique per merchant — surface it clearly

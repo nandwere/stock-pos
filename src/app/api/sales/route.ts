@@ -3,13 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { generateSaleNumber } from '@/lib/stock-calculations';
 import { getCurrentUser, getSession } from '@/lib/auth';
 import { PaymentMethod } from '@prisma/client';
-
-class InsufficientStockError extends Error {
-  constructor(public productName: string, public available: number, public requested: number) {
-    super(`Insufficient stock for ${productName}. Available: ${available}, Requested: ${requested}`);
-    this.name = 'InsufficientStockError';
-  }
-}
+import { applyStockChange, InsufficientStockError } from '@/lib/stock-history';
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -30,13 +24,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { items, paymentMethod, customerName, customerPhone, dueDate, amountPaid, notes } = body;
+    const { items, paymentMethod, customerName, customerPhone, dueDate, amountPaid, notes, draftId, depositMethod } = body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'At least one item is required' }, { status: 400 });
     }
     if (!Object.values(PaymentMethod).includes(paymentMethod)) {
       return NextResponse.json({ error: `Invalid payment method: ${paymentMethod}` }, { status: 400 });
+    }
+    if (depositMethod != null && !['CASH', 'CARD', 'MOBILE_MONEY'].includes(depositMethod)) {
+      return NextResponse.json({ error: 'Invalid depositMethod' }, { status: 400 });
     }
     for (const item of items) {
       if (!item.productId || typeof item.quantity !== 'number' || item.quantity <= 0) {
@@ -118,6 +115,15 @@ export async function POST(request: NextRequest) {
         ? round3(amountPaid ?? 0)
         : saleTotal;
 
+    // Cash tendered / change (the Sale.change column already exists)
+    const cashTendered =
+      paymentMethod === PaymentMethod.CASH && typeof amountPaid === 'number' ? round3(amountPaid) : saleTotal;
+
+    if (paymentMethod === PaymentMethod.CASH && cashTendered < saleTotal) {
+      return NextResponse.json({ error: 'Cash tendered must cover the total' }, { status: 400 });
+    }
+    const change = paymentMethod === PaymentMethod.CASH ? round3(cashTendered - saleTotal) : 0;
+
     if (paymentMethod !== PaymentMethod.CREDIT && resolvedAmountPaid < saleTotal) {
       return NextResponse.json({ error: 'amountPaid must cover the total for non-credit sales' }, { status: 400 });
     }
@@ -143,6 +149,9 @@ export async function POST(request: NextRequest) {
           items: {
             create: lineItems.map(({ _gross, ...li }) => li),
           },
+          change,
+          settledAt:
+            paymentMethod === PaymentMethod.CREDIT && resolvedAmountPaid >= saleTotal ? new Date() : null,
         },
         include: { items: true },
       });
@@ -150,18 +159,34 @@ export async function POST(request: NextRequest) {
       for (const item of items) {
         const product = productById.get(item.productId)!;
         if (product.isService) continue;
-        const result = await tx.product.updateMany({
-          where: { id: item.productId, merchantId, currentStock: { gte: item.quantity } },
-          data: { currentStock: { decrement: item.quantity } },
+        await applyStockChange(tx, {
+          merchantId,
+          productId: item.productId,
+          userId: user.id,
+          type: 'SALE',
+          change: -item.quantity,
+          referenceType: 'SALE',
+          referenceId: newSale.id,
         });
+      }
 
-        if (result.count === 0) {
-          const current = await tx.product.findUnique({
-            where: { id: item.productId },
-            select: { currentStock: true },
-          });
-          throw new InsufficientStockError(product.name, Number(current?.currentStock ?? 0), item.quantity);
-        }
+      if (draftId) {
+        await tx.draftSale.deleteMany({ where: { id: draftId, merchantId } });
+      }
+
+      if (resolvedAmountPaid > 0) {
+        const isCredit = paymentMethod === PaymentMethod.CREDIT;
+        await tx.salePayment.create({
+          data: {
+            merchantId,
+            saleId: newSale.id,
+            userId: user.id,
+            kind: isCredit ? 'DEPOSIT' : 'SALE',
+            method: isCredit ? (depositMethod ?? PaymentMethod.CASH) : paymentMethod,
+            amount: resolvedAmountPaid,
+            balanceAfter: round3(saleTotal - resolvedAmountPaid),
+          },
+        });
       }
 
       return newSale;

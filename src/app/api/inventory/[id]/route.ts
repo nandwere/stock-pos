@@ -1,7 +1,9 @@
 // app/api/sales/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getCurrentUser, getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { applyStockChange, recordPriceChange } from '@/lib/stock-history';
+import { Prisma } from '@prisma/client';
 
 // GET single sale
 export async function GET(
@@ -48,17 +50,18 @@ export async function GET(
   }
 }
 
-// PUT/UPDATE sale
+// PUT/UPDATE inventory item
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
-     if (!session) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const { merchantId } = session;
+    const user = await getCurrentUser();
 
     const { id } = await params;
     const body = await request.json();
@@ -74,26 +77,46 @@ export async function PUT(
         },
       }
     });
-    const { category, ...updateData } = body;
+    const { categoryId, ...updateData } = body;
     const existingCategory = await prisma.category.findUnique({
-      where: { id: category, merchantId },
+      where: { id: categoryId, merchantId },
       include: {
-
       }
     });
 
-    // Update sale logic
-    const updatedSale = await prisma.product.update({
-      where: { id, merchantId },
-      data: {
-        ...updateData,
-        categoryId: category || existingCategory?.id,
-        updatedAt: new Date().toISOString()
-      },
-      include: { category: true }
+    const updated = await prisma.$transaction(async (tx: { product: { findFirst: (arg0: { where: { id: string; merchantId: string; }; select: { costPrice: boolean; sellingPrice: boolean; currentStock: boolean; isService: boolean; }; }) => any; update: (arg0: { where: { id: string; }; data: any; }) => any; findUniqueOrThrow: (arg0: { where: { id: string; }; }) => any; }; }) => {
+      const before = await tx.product.findFirst({
+        where: { id, merchantId },
+        select: { costPrice: true, sellingPrice: true, currentStock: true, isService: true },
+      });
+      if (!before) throw new Error('NOT_FOUND');
+
+      const { currentStock, priceChangeReason, ...fields } = body; // strip stock from the plain update
+      const product = await tx.product.update({ where: { id }, data: fields });
+
+      await recordPriceChange(tx, {
+        merchantId, productId: id, userId: user?.id,
+        before: { costPrice: before.costPrice, sellingPrice: before.sellingPrice },
+        after: { costPrice: product.costPrice, sellingPrice: product.sellingPrice },
+        reason: priceChangeReason,
+      });
+
+      // If the edit form changes stock, log it as a delta
+      if (currentStock != null && !before.isService) {
+        const delta = new Prisma.Decimal(currentStock).minus(before.currentStock);
+        if (!delta.isZero()) {
+          await applyStockChange(tx, {
+            merchantId, productId: id, userId: user?.id,
+            type: 'MANUAL_EDIT', change: delta, allowNegative: true,
+            note: 'Edited from product form',
+          });
+        }
+      }
+
+      return tx.product.findUniqueOrThrow({ where: { id } });
     });
 
-    return NextResponse.json(updatedSale);
+    return NextResponse.json(updated);
   } catch (error) {
     console.error('Error updating product:', error);
     return NextResponse.json(
@@ -103,14 +126,14 @@ export async function PUT(
   }
 }
 
-// DELETE sale
+// DELETE inventory item
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
-     if (!session) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const { merchantId } = session;

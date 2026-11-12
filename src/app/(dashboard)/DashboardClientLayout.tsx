@@ -26,24 +26,18 @@ export default function DashboardClientLayout({
 
     return (
         <div className="flex min-h-screen bg-gray-100">
-            {/* ✅ Mobile Sidebar */}
+            {/* Mobile Sidebar */}
             {isSidebarOpen && (
                 <div className="fixed inset-0 z-50 flex md:hidden">
-                    {/* Overlay */}
-                    <div
-                        className="fixed inset-0 bg-black/50"
-                        onClick={() => setIsSidebarOpen(false)}
-                    />
-
-                    {/* Sidebar */}
-                    <Sidebar
-                        user={user}
-                    />
+                    <div className="fixed inset-0 bg-black/50" onClick={() => setIsSidebarOpen(false)} />
+                    <div className="relative z-10 h-full shadow-xl">
+                        <Sidebar user={user} />
+                    </div>
                 </div>
             )}
 
-            {/* ✅ Desktop Sidebar */}
-            <div className="hidden md:block">
+            {/* Desktop Sidebar */}
+            <div className="hidden md:block sticky top-0 h-screen shrink-0">
                 <Sidebar user={user} />
             </div>
 

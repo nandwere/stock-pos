@@ -91,6 +91,10 @@ model Merchant {
   expenses          Expense[]
   expenseCategories ExpenseCategory[]
   orders            Order[]
+  draftSales DraftSale[]
+  stockMovements StockMovement[]
+  priceHistory   PriceHistory[]
+  salePayments SalePayment[]
 
   @@index([slug])
   @@index([email])
@@ -115,6 +119,10 @@ model User {
   shifts           Shift[]
   expenses         Expense[]
   expenseApprovals ExpenseApproval[]
+  draftSales DraftSale[]
+  stockMovements StockMovement[]
+  priceChanges   PriceHistory[]
+  salePayments SalePayment[]
 
   // Email unique per merchant, not globally
   @@unique([merchantId, email])
@@ -168,6 +176,9 @@ model Product {
   supplierId  String?
   supplier    Supplier?         @relation(fields: [supplierId], references: [id])
   orderItems  OrderItem[]
+  draftItems DraftSaleItem[]
+  stockMovements StockMovement[]
+  priceHistory   PriceHistory[]
 
   // SKU and barcode unique per merchant
   @@unique([merchantId, sku])
@@ -197,6 +208,8 @@ model Sale {
   notes         String?
   createdAt     DateTime      @default(now())
 
+  settledAt DateTime?   // set when a credit sale is fully paid; null = still open
+  payments  SalePayment[]
   merchant Merchant   @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   user     User       @relation(fields: [userId], references: [id])
   items    SaleItem[]
@@ -207,6 +220,7 @@ model Sale {
   @@index([merchantId, userId])
   @@index([merchantId, createdAt])
   @@index([merchantId, paymentMethod])
+  @@index([merchantId, paymentMethod, settledAt])
 }
 
 model SaleItem {
@@ -595,4 +609,130 @@ model OrderItem {
 
   @@index([orderId])
   @@index([productId])
+}
+
+model DraftSale {
+  id            String   @id @default(cuid())
+  merchantId    String
+  userId        String
+  draftNumber   String
+  customerName  String?
+  customerPhone String?
+  notes         String?
+  subtotal      Decimal  @db.Decimal(10, 3)
+  discount      Decimal  @default(0) @db.Decimal(10, 3)
+  total         Decimal  @db.Decimal(10, 3)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  merchant Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id])
+  items    DraftSaleItem[]
+
+  @@unique([merchantId, draftNumber])
+  @@index([merchantId, userId])
+  @@index([merchantId, updatedAt])
+}
+
+model DraftSaleItem {
+  id        String  @id @default(cuid())
+  draftId   String
+  productId String
+  quantity  Decimal @db.Decimal(10, 3)
+  unitPrice Decimal @db.Decimal(10, 3)
+  discount  Decimal @default(0) @db.Decimal(10, 3)
+  subtotal  Decimal @db.Decimal(10, 3)
+
+  draft   DraftSale @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  product Product   @relation(fields: [productId], references: [id])
+
+  @@index([draftId])
+  @@index([productId])
+}
+
+enum StockMovementType {
+  OPENING            // initial stock when the product was created / backfilled
+  RESTOCK
+  SALE
+  RETURN
+  ADJUSTMENT_ADD
+  ADJUSTMENT_REMOVE
+  DAMAGE
+  THEFT
+  EXPIRY
+  CORRECTION
+  COUNT              // stock-count reconciliation
+  MANUAL_EDIT        // stock changed via the product edit form
+}
+
+model StockMovement {
+  id             String            @id @default(cuid())
+  merchantId     String
+  productId      String
+  userId         String?
+  type           StockMovementType
+  quantityChange Decimal           @db.Decimal(10, 3) // signed: -2.500 for a sale
+  stockBefore    Decimal           @db.Decimal(10, 3)
+  stockAfter     Decimal           @db.Decimal(10, 3)
+  referenceType  String?           // "SALE" | "ORDER" | "ADJUSTMENT" | "STOCK_COUNT"
+  referenceId    String?
+  note           String?
+  createdAt      DateTime          @default(now())
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+  user     User?    @relation(fields: [userId], references: [id])
+
+  @@index([merchantId, productId, createdAt])
+  @@index([merchantId, createdAt])
+  @@index([referenceType, referenceId])
+}
+
+model PriceHistory {
+  id              String   @id @default(cuid())
+  merchantId      String
+  productId       String
+  userId          String?
+  oldCostPrice    Decimal? @db.Decimal(10, 3) // null on the initial record
+  newCostPrice    Decimal  @db.Decimal(10, 3)
+  oldSellingPrice Decimal? @db.Decimal(10, 3)
+  newSellingPrice Decimal  @db.Decimal(10, 3)
+  reason          String?
+  createdAt       DateTime @default(now())
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+  user     User?    @relation(fields: [userId], references: [id])
+
+  @@index([merchantId, productId, createdAt])
+}
+
+enum SalePaymentKind {
+  SALE       // paid in full at the till (cash / M-Pesa / card sale)
+  DEPOSIT    // upfront part-payment on a credit sale
+  REPAYMENT  // later payment against a credit balance
+}
+
+model SalePayment {
+  id           String          @id @default(cuid())
+  merchantId   String
+  saleId       String
+  userId       String?
+  kind         SalePaymentKind
+  method       PaymentMethod   // CASH | CARD | MOBILE_MONEY (never CREDIT)
+  amount       Decimal         @db.Decimal(10, 3)
+  balanceAfter Decimal         @db.Decimal(10, 3) // what the customer still owes after this payment
+  reference    String?         // M-Pesa code, card slip no., etc.
+  notes        String?
+  createdAt    DateTime        @default(now())
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  sale     Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id])
+
+  // Stops the same M-Pesa code being recorded twice (NULLs are allowed repeatedly)
+  @@unique([merchantId, reference])
+  @@index([merchantId, saleId])
+  @@index([merchantId, createdAt])
+  @@index([merchantId, method, createdAt])
 }
