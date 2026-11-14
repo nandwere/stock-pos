@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser, getSession } from '@/lib/auth';
+import { getActor, getCurrentUser, getSession } from '@/lib/auth';
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -48,16 +48,16 @@ export function buildDraftItems(items: any[]) {
 
 export async function GET() {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const actor = await getActor();
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!actor.can('sales.create')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
 
     const drafts = await prisma.draftSale.findMany({
       where: {
-        merchantId: session.merchantId,
+        merchantId: actor.merchantId,
         // Cashiers only see their own drafts; owners/managers see all
-        ...(user.role === 'CASHIER' ? { userId: user.id } : {}),
+        ...(actor.can('sales.drafts.all') ? {} : { userId: actor.userId }),
       },
       include: {
         user: { select: { name: true } },

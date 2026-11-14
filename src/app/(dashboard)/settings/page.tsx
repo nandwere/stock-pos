@@ -6,21 +6,27 @@ import {
     Printer, Database, Palette, Save, Upload,
     RefreshCw, UserCheck, UserX, Pencil, Loader2,
     CheckCircle,
-    Receipt,
-    CheckCheck,
+    ListChecks,
+    KeyRound,
+    Trash2,
+    Plus,
+    ArrowUp,
+    ArrowDown,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMerchantsUsers, useToggleUserStatus, useUsers } from '@/lib/hooks/use-users';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
+import { useCurrentUser, useMerchantsUsers, useToggleUserStatus } from '@/lib/hooks/use-users';
 import { User } from '@/types';
 import { DEFAULTS, MerchantSettings, useSaveSettings, useSettings } from '@/lib/hooks/use-settings';
-import { Plan, PLAN_LABELS } from '@/lib/plans';
-import { useHandlePaymentRequest, usePaymentRequests } from '@/lib/hooks/use-payments';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
+import {
+    useRoles, useCreateRole, useUpdateRole, useDeleteRole, useCatalog, useSaveCatalog,
+    RoleDraft, CatalogGroup, CatalogPermission
+} from '@/lib/hooks/use-permissions';
+import { DEFAULT_ROLE_KEYS } from '@/lib/permissions';
+import { CurrentUser } from '@/lib/auth';
 
 // ── Tabs config ───────────────────────────────────────────────────────────────
-
 const TABS = [
     { id: 'business', label: 'Business Info', icon: Building2 },
     { id: 'currency', label: 'Currency & Tax', icon: DollarSign },
@@ -28,24 +34,49 @@ const TABS = [
     { id: 'payment', label: 'Payment Requests', icon: RefreshCw },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'users', label: 'User Management', icon: Users },
+    { id: 'roles', label: 'Roles & Permissions', icon: KeyRound },
     { id: 'security', label: 'Security', icon: Shield },
+    { id: 'catalog', label: 'Permission Catalog', icon: ListChecks },
     { id: 'backup', label: 'Backup & Data', icon: Database },
     { id: 'appearance', label: 'Appearance', icon: Palette },
 ];
 
 // Tabs that manage their own save flow
-const NO_SAVE_TABS = ['users', 'appearance'];
+const NO_SAVE_TABS = ['users', 'roles', 'catalog', 'appearance'];
 
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
-    const [activeTab, setActiveTab] = useState('business');
+    // useSearchParams needs a Suspense boundary in the Next.js App Router
+    return (
+        <Suspense fallback={<div className="flex justify-center h-64 items-center"><Loader2 className="w-10 h-10 text-blue-600 animate-spin" /></div>}>
+            <SettingsContent />
+        </Suspense>
+    );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+function SettingsContent() {
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
     const [form, setForm] = useState<MerchantSettings>(DEFAULTS);
     const [saved, setSaved] = useState(false);
-    
+    const { data: me } = useCurrentUser();
+    const can = (p: string) => !!me && (me.isSuperAdmin || me.permissions.includes(p));
 
-    const { data, isLoading, error } = useSettings();
+    const { data, isLoading, error } = useSettings({ enabled: can('settings.edit') });
     const saveMutation = useSaveSettings();
+
+    const isAdmin = data?.isSuperAdmin === true;
+    const visibleTabs = TABS.filter(t => t.id !== 'catalog' || isAdmin);
+    const requested = searchParams.get('tab');
+    const activeTab = visibleTabs.some(t => t.id === requested) ? requested! : 'business';
+
+    function setActiveTab(id: string) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('tab', id);
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
 
     useEffect(() => {
         if (data) setForm({ ...DEFAULTS, ...data });
@@ -94,7 +125,7 @@ export default function SettingsPage() {
                 {/* Sidebar */}
                 <div className="w-64 flex-shrink-0">
                     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                        {TABS.map(tab => {
+                        {visibleTabs.map(tab => {
                             const Icon = tab.icon;
                             return (
                                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -125,6 +156,8 @@ export default function SettingsPage() {
                         {activeTab === 'notifications' && <NotificationsTab form={form} set={set} />}
                         {activeTab === 'users' && <UserManagementTab />}
                         {activeTab === 'security' && <SecurityTab form={form} set={set} />}
+                        {activeTab === 'catalog' && isAdmin && <CatalogTab />}
+                        {activeTab === 'roles' && <RolesTab />}
                         {activeTab === 'backup' && <BackupTab form={form} set={set} />}
                         {activeTab === 'appearance' && <AppearanceTab />}
 
@@ -297,9 +330,9 @@ function NotificationsTab({ form, set }: TabProps) {
 // ── Tab: Users ────────────────────────────────────────────────────────────────
 
 function UserManagementTab() {
-    const { data: users = [] } = useMerchantsUsers() as { data: User[] };
+    const { data: users = [] } = useMerchantsUsers() as { data: CurrentUser[] };
     const { mutateAsync: toggleStatus } = useToggleUserStatus();
-    const [pendingUser, setPendingUser] = useState<User | null>(null);
+    const [pendingUser, setPendingUser] = useState<CurrentUser | null>(null);
     const [toggling, setToggling] = useState(false);
 
     async function handleToggle() {
@@ -342,13 +375,13 @@ function UserManagementTab() {
                                     No users found.
                                 </td>
                             </tr>
-                        ) : users.map((user: User) => (
+                        ) : users.map((user: CurrentUser) => (
                             <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 text-sm font-medium text-gray-900">{user.name}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
                                 <td className="px-6 py-4">
                                     <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                                        {user.role}
+                                        {user?.role?.name || 'No Role'}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4">
@@ -466,6 +499,302 @@ function BackupTab({ form, set }: TabProps) {
                             Export {label}
                         </button>
                     ))}
+                </div>
+            </div>
+        </Section>
+    );
+}
+
+type DraftPerm = CatalogPermission & { isNew?: boolean };
+type DraftGroup = Omit<CatalogGroup, 'permissions'> & { isNew?: boolean; permissions: DraftPerm[] };
+
+const slug = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+function CatalogTab() {
+    const { data, isLoading, error } = useCatalog();
+    const save = useSaveCatalog();
+    const [groups, setGroups] = useState<DraftGroup[] | null>(null);
+    const [saved, setSaved] = useState(false);
+
+    useEffect(() => {
+        if (data) setGroups(data.map(g => ({ ...g, permissions: g.permissions.map(p => ({ ...p })) })));
+    }, [data]);
+
+    if (error) return <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{(error as Error).message}</div>;
+    if (isLoading || !groups) return <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div>;
+
+    const patchGroup = (gi: number, patch: Partial<DraftGroup>) =>
+        setGroups(gs => gs!.map((g, i) => (i === gi ? { ...g, ...patch } : g)));
+
+    const patchPerm = (gi: number, pi: number, patch: Partial<DraftPerm>) =>
+        setGroups(gs => gs!.map((g, i) => i !== gi ? g : {
+            ...g, permissions: g.permissions.map((p, j) => (j === pi ? { ...p, ...patch } : p)),
+        }));
+
+    function moveGroup(gi: number, dir: -1 | 1) {
+        setGroups(gs => {
+            const next = [...gs!]; const to = gi + dir;
+            if (to < 0 || to >= next.length) return gs;
+            [next[gi], next[to]] = [next[to], next[gi]];
+            return next;
+        });
+    }
+
+    function movePerm(gi: number, pi: number, to: number) {
+        if (to === gi) return;
+        setGroups(gs => {
+            const next = gs!.map(g => ({ ...g, permissions: [...g.permissions] }));
+            const [p] = next[gi].permissions.splice(pi, 1);
+            next[to].permissions.push(p);
+            return next;
+        });
+    }
+
+    function toggleDefault(gi: number, pi: number, role: string, on: boolean) {
+        const cur = groups![gi].permissions[pi].defaultRoleKeys;
+        patchPerm(gi, pi, { defaultRoleKeys: on ? [...cur, role] : cur.filter(r => r !== role) });
+    }
+
+    async function handleSave() {
+        const payload = groups!.map(g => ({
+            key: g.key || slug(g.label),
+            label: g.label,
+            permissions: g.permissions.map(({ isNew, ...p }) => p),
+        }));
+        try {
+            await save.mutateAsync(payload);
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+        } catch { /* shown below */ }
+    }
+
+    const groupOptions = groups.map((g, i) => ({ value: String(i), label: g.label || '(unnamed)' }));
+
+    return (
+        <Section title="Permission Catalog"
+            description="Platform-wide groups and permissions. Changes apply to every merchant."
+            action={
+                <button onClick={() => setGroups(gs => [...gs!, { key: '', label: 'New group', isSystem: false, isNew: true, permissions: [] }])}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2">
+                    <Plus className="w-4 h-4" /> Add group
+                </button>
+            }>
+            {save.isError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    {(save.error as Error).message}
+                </div>
+            )}
+            <p className="text-xs text-gray-500">
+                A permission key only has an effect once a route calls <code>hasPermission(&apos;that.key&apos;)</code>.
+                Built-in groups and permissions can be renamed and moved but not deleted.
+            </p>
+
+            {groups.map((g, gi) => (
+                <div key={gi} className="border border-gray-200 rounded-lg">
+                    <div className="flex items-center gap-2 p-3 bg-gray-50 border-b border-gray-200">
+                        <Input value={g.label} onChange={v => patchGroup(gi, { label: v })} className="max-w-xs" />
+                        <button onClick={() => moveGroup(gi, -1)} disabled={gi === 0} className="p-1.5 text-gray-500 hover:text-gray-900 disabled:opacity-30"><ArrowUp className="w-4 h-4" /></button>
+                        <button onClick={() => moveGroup(gi, 1)} disabled={gi === groups.length - 1} className="p-1.5 text-gray-500 hover:text-gray-900 disabled:opacity-30"><ArrowDown className="w-4 h-4" /></button>
+                        <button onClick={() => setGroups(gs => gs!.filter((_, i) => i !== gi))} disabled={g.isSystem}
+                            title={g.isSystem ? 'Built-in group' : 'Delete group'}
+                            className="ml-auto p-1.5 text-red-500 hover:bg-red-50 rounded disabled:opacity-30 disabled:cursor-not-allowed">
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    <div className="divide-y divide-gray-100">
+                        {g.permissions.map((p, pi) => (
+                            <div key={pi} className="grid grid-cols-12 gap-2 items-center p-3">
+                                <div className="col-span-3"><Input value={p.key} disabled={!p.isNew} onChange={v => patchPerm(gi, pi, { key: v })} placeholder="invoices.view" /></div>
+                                <div className="col-span-3"><Input value={p.label} onChange={v => patchPerm(gi, pi, { label: v })} placeholder="Label" /></div>
+                                <div className="col-span-2"><Select value={String(gi)} onChange={v => movePerm(gi, pi, Number(v))} options={groupOptions} /></div>
+                                <label className="col-span-1 flex items-center gap-1 text-xs text-gray-600">
+                                    <input type="checkbox" checked={p.adminOnly} onChange={e => patchPerm(gi, pi, { adminOnly: e.target.checked })} /> Admin only
+                                </label>
+                                {DEFAULT_ROLE_KEYS.map(k => (
+                                    <label key={k} className="col-span-1 flex items-center gap-1 text-xs text-gray-600">
+                                        <input type="checkbox" disabled={p.adminOnly}
+                                            checked={!p.adminOnly && p.defaultRoleKeys.includes(k)}
+                                            onChange={e => toggleDefault(gi, pi, k, e.target.checked)} />
+                                        {k === 'manager' ? 'Mgr' : 'Cash'}
+                                    </label>
+                                ))}
+                                <button onClick={() => patchGroup(gi, { permissions: g.permissions.filter((_, j) => j !== pi) })}
+                                    disabled={p.isSystem} title={p.isSystem ? 'Built-in permission' : 'Delete permission'}
+                                    className="col-span-1 justify-self-end p-1.5 text-red-500 hover:bg-red-50 rounded disabled:opacity-30 disabled:cursor-not-allowed">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ))}
+                        <div className="p-3">
+                            <button onClick={() => patchGroup(gi, {
+                                permissions: [...g.permissions, { key: '', label: '', adminOnly: false, defaultRoleKeys: [], isSystem: false, isNew: true }],
+                            })} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                <Plus className="w-3.5 h-3.5" /> Add permission
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ))}
+
+            <div className="flex items-center justify-end gap-3">
+                {saved && <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium"><CheckCircle className="w-4 h-4" /> Saved</span>}
+                <button onClick={handleSave} disabled={save.isPending}
+                    className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2 text-sm">
+                    {save.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : <><Save className="w-4 h-4" /> Save Catalog</>}
+                </button>
+            </div>
+        </Section>
+    );
+}
+
+function RolesTab() {
+    const { data, isLoading, error } = useRoles();
+    const create = useCreateRole();
+    const update = useUpdateRole();
+    const remove = useDeleteRole();
+
+    const [selectedId, setSelectedId] = useState<string | 'new' | null>(null);
+    const [draft, setDraft] = useState<RoleDraft | null>(null);
+    const [saved, setSaved] = useState(false);
+    const [err, setErr] = useState('');
+
+    useEffect(() => {
+        if (!data || selectedId === 'new') return;
+        const r = data.roles.find(r => r.id === selectedId) ?? data.roles[0];
+        if (r) {
+            setSelectedId(r.id);
+            setDraft({ name: r.name, description: r.description ?? '', level: r.level, permissions: r.permissions });
+        }
+    }, [data, selectedId]);
+
+    if (error) return <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{(error as Error).message}</div>;
+    if (isLoading || !data || !draft) return <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div>;
+
+    const isNew = selectedId === 'new';
+    const role = data.roles.find(r => r.id === selectedId);
+    const editable = isNew || !!role?.editable;
+    const grantable = new Set(data.grantable);
+    const busy = create.isPending || update.isPending || remove.isPending;
+
+    function startNew() {
+        setErr('');
+        setSelectedId('new');
+        setDraft({ name: '', description: '', level: Math.min(10, data!.maxLevel), permissions: [] });
+    }
+
+    function toggle(key: string, on: boolean) {
+        setDraft(d => d && { ...d, permissions: on ? [...d.permissions, key] : d.permissions.filter(k => k !== key) });
+    }
+
+    async function handleSave() {
+        setErr('');
+        try {
+            if (isNew) {
+                const r = await create.mutateAsync(draft!);
+                setSelectedId(r.id);
+            } else {
+                await update.mutateAsync({ id: selectedId as string, ...draft! });
+            }
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+        } catch (e) { setErr((e as Error).message); }
+    }
+
+    async function handleDelete() {
+        if (!role || !confirm(`Delete the "${role.name}" role?`)) return;
+        setErr('');
+        try { await remove.mutateAsync(role.id); setSelectedId(null); }
+        catch (e) { setErr((e as Error).message); }
+    }
+
+    return (
+        <Section title="Roles & Permissions"
+            description="Create roles and choose what each can do. Admin always has full access."
+            action={
+                <button onClick={startNew}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2 text-sm">
+                    <Plus className="w-4 h-4" /> New role
+                </button>
+            }>
+            <div className="flex gap-6">
+                {/* Role list */}
+                <div className="w-56 shrink-0 border border-gray-200 rounded-lg overflow-hidden self-start">
+                    {data.roles.map(r => (
+                        <button key={r.id} onClick={() => { setErr(''); setSelectedId(r.id); }}
+                            className={`w-full text-left px-4 py-3 border-l-4 border-b border-b-gray-100 ${selectedId === r.id ? 'bg-blue-50 border-l-blue-700' : 'border-l-transparent hover:bg-gray-50'}`}>
+                            <p className="text-sm font-medium text-gray-900">{r.name}</p>
+                            <p className="text-xs text-gray-500">{r.userCount} user{r.userCount === 1 ? '' : 's'}{r.isAdmin ? ' · locked' : ''}</p>
+                        </button>
+                    ))}
+                    {isNew && <div className="px-4 py-3 text-sm text-blue-700 bg-blue-50 border-l-4 border-l-blue-700">New role…</div>}
+                </div>
+
+                {/* Editor */}
+                <div className="flex-1 min-w-0 space-y-5">
+                    {err && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{err}</div>}
+                    {!editable && (
+                        <div className="bg-gray-50 border border-gray-200 text-gray-600 px-4 py-3 rounded-lg text-sm">
+                            {role?.isAdmin ? 'Admin is locked and always has every permission.' : 'You can only edit roles ranked below your own.'}
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <Field label="Role name" required>
+                            <Input value={draft.name} disabled={!editable} onChange={v => setDraft(d => d && { ...d, name: v })} placeholder="Supervisor" />
+                        </Field>
+                        <Field label="Level" hint={`1–${data.maxLevel}. Higher ranks manage lower ones`}>
+                            <Input type="number" min="1" max={String(data.maxLevel)} value={String(draft.level)}
+                                disabled={!editable || !!role?.isAdmin}
+                                onChange={v => setDraft(d => d && { ...d, level: Number(v) })} />
+                        </Field>
+                        <Field label="Description" className="md:col-span-2">
+                            <Input value={draft.description} disabled={!editable} onChange={v => setDraft(d => d && { ...d, description: v })} />
+                        </Field>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        {data.catalog.map(group => (
+                            <div key={group.key}>
+                                <div className="px-6 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                    {group.label}
+                                </div>
+                                {group.permissions.map(p => {
+                                    const locked = !editable || p.adminOnly || !grantable.has(p.key);
+                                    const checked = role?.isAdmin ? true : draft.permissions.includes(p.key) && !p.adminOnly;
+                                    return (
+                                        <label key={p.key} className="flex items-center justify-between px-6 py-2.5 border-b border-gray-100 hover:bg-gray-50">
+                                            <span className="text-sm text-gray-800">
+                                                {p.label}
+                                                {p.adminOnly && <span className="ml-2 text-xs text-gray-400">Admin only</span>}
+                                                {!p.adminOnly && !grantable.has(p.key) && <span className="ml-2 text-xs text-gray-400">you don&apos;t hold this</span>}
+                                            </span>
+                                            <input type="checkbox" checked={checked} disabled={locked}
+                                                onChange={e => toggle(p.key, e.target.checked)}
+                                                className="w-4 h-4 rounded border-gray-300 text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed" />
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                        {role && !role.isSystem && editable ? (
+                            <button onClick={handleDelete} disabled={busy} className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1">
+                                <Trash2 className="w-4 h-4" /> Delete role
+                            </button>
+                        ) : <span />}
+                        <div className="flex items-center gap-3">
+                            {saved && <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium"><CheckCircle className="w-4 h-4" /> Saved</span>}
+                            {editable && (
+                                <button onClick={handleSave} disabled={busy || !draft.name.trim()}
+                                    className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2 text-sm">
+                                    {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : <><Save className="w-4 h-4" /> {isNew ? 'Create role' : 'Save role'}</>}
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
         </Section>

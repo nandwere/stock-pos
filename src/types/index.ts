@@ -1,5 +1,6 @@
+import { CurrentUser } from "@/lib/auth";
 
-export type UserRole = 'OWNER' | 'MANAGER' | 'CASHIER';
+export type UserRole = 'OWNER' | 'MANAGER' | 'CASHIER' | 'ADMIN';
 export type MerchantPlan = 'FREE' | 'STARTER' | 'GROWTH' | 'ENTERPRISE';
 
 export interface Merchant {
@@ -39,7 +40,7 @@ export interface User {
   merchantId: string;
   email: string;
   name: string;
-  role: UserRole;
+  roleId: string;
   isActive: boolean;
   plan?: MerchantPlan;
 }
@@ -48,9 +49,11 @@ export interface SessionPayload {
   merchantId: string;
   userId: string;
   email: string;
-  role: UserRole;
   expiresAt: Date;
   plan: MerchantPlan;
+  roleId: string;
+  isSuperAdmin: boolean;
+  role: { id: string; name: string; level: number; isAdmin: boolean };
 }
 
 export interface Category {
@@ -109,7 +112,7 @@ export interface Sale {
   notes: boolean;
   items: SaleItem[]
   createdAt: Date
-  user: User
+  user: CurrentUser
 }
 
 export interface StockCountEntry {
@@ -149,7 +152,7 @@ export interface StockAdjustment {
 
   // Relationss
   product: Product;
-  user: User;
+  user: CurrentUser;
 }
 
 export interface CreateAdjustmentDTO {

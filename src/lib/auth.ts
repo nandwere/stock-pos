@@ -1,10 +1,13 @@
 // lib/auth.ts
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import { jwtVerify, SignJWT } from 'jose';
 import bcrypt from 'bcryptjs';
-import { prisma } from './prisma';
-import { MerchantPlan, SessionPayload, User, UserRole } from '@/types';
+import { cache } from 'react';
+import { loadActor } from '@/lib/permissions.server';
+import { MerchantPlan, SessionPayload, UserRole } from '@/types';
+import { prisma } from '@/lib/prisma';
+import { getSecuritySettings, passwordExpired, sendLoginOtp } from './security.server';
+import { redirect } from 'next/navigation';
 
 const secret = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-secret-key-change-in-production'
@@ -45,15 +48,17 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
 /**
  * Create session
  */
-export async function createSession(user: User) {
+export async function createSession(user: CurrentUser) {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   const payload: SessionPayload = {
     userId: user.id,
     merchantId: user.merchantId,
     email: user.email,
-    role: user.role,
     expiresAt,
     plan: user.plan || 'FREE',
+    roleId: user.roleId,
+    isSuperAdmin: user.isSuperAdmin,
+    role: user.role
   };
 
   const token = await createToken(payload);
@@ -82,60 +87,48 @@ export async function getSession(): Promise<SessionPayload | null> {
 /**
  * Get current user
  */
-export async function getCurrentUser(): Promise<User | null> {
-  const session = await getSession();
 
+
+export type CurrentUser = {
+  id: string;
+  email: string;
+  name: string;
+  isActive: boolean;
+  isSuperAdmin: boolean;
+  merchantId: string;
+  roleId: string;
+  role: { id: string; name: string; level: number; isAdmin: boolean };
+  plan?: MerchantPlan;
+  mustChangePassword?: boolean;
+};
+
+// cache() means one DB hit per request, however many times it's called
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  const session = await getSession();
   if (!session) return null;
 
   try {
     const user = await prisma.user.findUnique({
       where: { id: session.userId },
       select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        isActive: true,
-        merchantId: true,},
+        id: true, email: true, name: true, isActive: true,
+        isSuperAdmin: true, merchantId: true, roleId: true,
+        role: { select: { id: true, name: true, level: true, isAdmin: true } },
+      },
     });
-
     if (!user || !user.isActive) return null;
 
-    return user;
+    return {
+      ...user,
+      roleId: user.roleId ?? '',
+      role: user.role ?? { id: '', name: '', level: 0, isAdmin: false },
+      isSuperAdmin: !!user.isSuperAdmin,
+    };
   } catch (error) {
     console.error('Error fetching user:', error);
     return null;
   }
-}
-
-/**
- * Require authentication
- */
-export async function requireAuth(): Promise<User> {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
-  return user;
-}
-
-/**
- * Require specific role
- */
-export async function requireRole(allowedRoles: UserRole | UserRole[]): Promise<User> {
-  const user = await requireAuth();
-
-  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
-
-  if (!roles.includes(user.role)) {
-    redirect('/unauthorized');
-  }
-
-  return user;
-}
-
+});
 /**
  * Destroy session
  */
@@ -161,78 +154,65 @@ export async function loginUser(
   email: string,
   password: string,
   merchantIdentifier: string     // slug or custom domain
-): Promise<{ success: boolean; error?: string; user?: User }> {
+): Promise<{ success: boolean; error?: string; passwordChangeRequired?: boolean; user?: CurrentUser, twoFactorRequired?: boolean; challengeId?: string, maskedEmail?: string }> {
   try {
-    // 1. Resolve the merchant first — fail fast if it doesn't exist
-    //    or is suspended before we do any password work.
+    const fail = { success: false as const, error: 'Invalid email or password' };
+
     const merchant = await prisma.merchant.findUnique({
-      where: { slug: merchantIdentifier },
-      select: { id: true, isActive: true, name: true, plan: true, slug: true },
+      where: { slug: merchantIdentifier }, select: { id: true, isActive: true },
     });
-    console.log('Resolved merchant for login:', merchant);
+    if (!merchant?.isActive) return fail;
 
-    if (!merchant) {
-      return { success: false, error: 'Workspace not found' };
-    }
-
-    if (!merchant.isActive) {
-      return { success: false, error: 'This workspace has been suspended. Contact support.' };
-    }
-
-    // 2. Look up the user scoped to that merchant.
-    //    The schema enforces @@unique([merchantId, email]) so this
-    //    query is always hitting an indexed, tenant-scoped row.
     const user = await prisma.user.findUnique({
-      where: {
-        merchantId_email: {         // compound unique index name Prisma generates
-          merchantId: merchant.id,
-          email,
-        },
+      where: { merchantId_email: { merchantId: merchant.id, email } },
+      select: {
+        id: true, email: true, name: true, password: true, isActive: true,
+        isSuperAdmin: true, passwordChangedAt: true, mustChangePassword: true
       },
     });
+    if (!user || !user.isActive || !(await bcrypt.compare(password, user.password))) return fail;
 
-    // Deliberate: same error for "no user" and "wrong password" to
-    // avoid leaking whether an email is registered on a workspace.
-    if (!user) {
-      return { success: false, error: 'Invalid email or password' };
+    const sec = await getSecuritySettings(merchant.id);
+    if (sec.twoFactor) {
+      const r = await sendLoginOtp(user, merchant.id);
+      if ('error' in r) return { success: false as const, error: r.error };
+      return { success: true as const, twoFactorRequired: true as const, ...r };
     }
-
-    if (!user.isActive) {
-      return { success: false, error: 'Account is inactive. Contact administrator.' };
-    }
-
-    const isValidPassword = await bcrypt.compare(password, user.password);
-
-    if (!isValidPassword) {
-      return { success: false, error: 'Invalid email or password' };
-    }
-
-    await createSession({
-      id: user.id,
-      merchantId: user.merchantId,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      isActive: user.isActive,
-      plan: merchant.plan as MerchantPlan,
-    });
-
-    return {
-      success: true,
-      user: {
-        id: user.id,
-        merchantId: user.merchantId,
-        email: user.email,
-        name: user.name,
-        role: user.role,  
-        isActive: user.isActive,
-        plan: merchant.plan as MerchantPlan,
-      },
-    };
+    return finishLogin(user.id, merchant.id);
   } catch (error) {
     console.error('Login error:', error);
     return { success: false, error: 'An error occurred during login' };
   }
+}
+
+export async function finishLogin(userId: string, merchantId: string) {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { id: true, email: true, name: true, isSuperAdmin: true, passwordChangedAt: true, mustChangePassword: true, isActive: true },
+  });
+  const sec = await getSecuritySettings(merchantId);
+
+  let mustChange: boolean = Boolean(user.mustChangePassword);
+  if (!mustChange && sec.rotation && passwordExpired(user.passwordChangedAt)) {
+    await prisma.user.update({ where: { id: user.id }, data: { mustChangePassword: true } });
+    mustChange = true;
+  }
+
+  await createSession({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    isActive: true,
+    isSuperAdmin: user.isSuperAdmin, // will be loaded in getCurrentUser
+    merchantId,
+    roleId: '', // will be loaded in getCurrentUser
+    role: { id: '', name: '', level: 0, isAdmin: false }, // will be loaded in getCurrentUser
+  });
+  return {
+    success: true as const,
+    passwordChangeRequired: mustChange,
+    user: { id: user.id, name: user.name, email: user.email, isSuperAdmin: user.isSuperAdmin, merchantId, isActive: user.isActive, roleId: '', role: { id: '', name: '', level: 0, isAdmin: false, } },
+  };
 }
 
 /**
@@ -242,9 +222,9 @@ export async function registerUser(data: {
   email: string;
   name: string;
   password: string;
-  role: UserRole;
+  roleId: string;
   merchantId: string;
-}): Promise<{ success: boolean; error?: string; user?: User }> {
+}): Promise<{ success: boolean; error?: string; user?: CurrentUser }> {
   try {
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -264,7 +244,7 @@ export async function registerUser(data: {
         email: data.email,
         name: data.name,
         password: hashedPassword,
-        role: data.role,
+        roleId: data.roleId,
         isActive: true,
         merchantId: data.merchantId, // Assuming you have a merchantId in the registration data
       },
@@ -272,13 +252,22 @@ export async function registerUser(data: {
         id: true,
         email: true,
         name: true,
-        role: true,
         isActive: true,
         merchantId: true,
+        roleId: true,
+        isSuperAdmin: true,
+        role: { select: { id: true, name: true, level: true, isAdmin: true } },
       },
     });
 
-    return { success: true, user };
+    return {
+      success: true,
+      user: {
+        ...user,
+        roleId: user.roleId || '',
+        role: user.role || { id: '', name: '', level: 0, isAdmin: false },
+      },
+    };
   } catch (error) {
     console.error('Registration error:', error);
     return { success: false, error: 'An error occurred during registration' };
@@ -294,50 +283,24 @@ export function getRoleDashboard(role: UserRole): string {
   return '/';
 }
 
+export async function requireAuth(): Promise<CurrentUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect('/login');
+  if (user.mustChangePassword) redirect('/change-password?required=1');
+  return user;
+}
+
+// Memoised per request, so many hasPermission calls cost one query
+export const getActor = cache(async () => {
+  const user = await getCurrentUser();
+  if (!user || user.mustChangePassword) return null;
+  return loadActor(user);
+});
+
 /**
  * Check if user has permission
  */
-export async function hasPermission(permission: string): Promise<boolean> {
-  const user = await getCurrentUser();
-
-  if (!user) return false;
-
-  const permissions: Record<UserRole, string[]> = {
-    OWNER: [
-      'users.view',
-      'users.create',
-      'users.edit',
-      'users.delete',
-      'products.view',
-      'products.create',
-      'products.edit',
-      'products.delete',
-      'sales.view',
-      'sales.create',
-      'sales.delete',
-      'stock.count',
-      'stock.adjust',
-      'reports.view',
-      'settings.edit',
-    ],
-    MANAGER: [
-      'users.view',
-      'products.view',
-      'products.create',
-      'products.edit',
-      'sales.view',
-      'sales.create',
-      'stock.count',
-      'stock.adjust',
-      'reports.view',
-    ],
-    CASHIER: [
-      'products.view',
-      'sales.view',
-      'sales.create',
-      'stock.count',
-    ],
-  };
-
-  return permissions[user.role]?.includes(permission) || false;
+export async function hasPermission(permission: string) {
+  const actor = await getActor();
+  return !!actor && actor.can(permission);
 }

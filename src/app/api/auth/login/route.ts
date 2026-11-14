@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password } = body;
 
-    console.log('Login attempt with email:', email);
+    // console.log('Login attempt with email:', email);
 
     if (!email || !password) {
       return NextResponse.json(
@@ -15,11 +15,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    console.log("Request Headers:", Object.fromEntries(request.headers.entries()));
+    // console.log("Request Headers:", Object.fromEntries(request.headers.entries()));
 
     // Resolved by middleware — never comes from the request body
     const merchantSlug = request.headers.get('x-merchant-slug');
-    console.log('Login attempt for merchant slug:', merchantSlug);  
+    console.log('Login attempt for merchant slug:', merchantSlug);
 
     if (!merchantSlug) {
       return NextResponse.json(
@@ -28,22 +28,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+
     const result = await loginUser(email, password, merchantSlug);
+    if (!result.success) return NextResponse.json({ error: result.error }, { status: 401 });
 
-    if (!result.success) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: 401 }
-      );
+    if ('twoFactorRequired' in result) {
+      return NextResponse.json({
+        twoFactorRequired: true, challengeId: result.challengeId, maskedEmail: result.maskedEmail,
+      });
     }
-
-    return NextResponse.json(
-      {
-        success: true,
-        user: result.user
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({
+      success: true, user: result.user, passwordChangeRequired: result.passwordChangeRequired,
+    });
   } catch (error) {
     console.error('Login API error:', error);
     return NextResponse.json(

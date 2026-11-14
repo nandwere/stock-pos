@@ -160,13 +160,23 @@ async function notifyAdminsOfNewOrder(
   // existing email module (the same file sendOtpEmail is in).
   const { sendNewOrderEmail } = await import('./email');
 
-  const owners = await prisma.user.findMany({
-    where: { merchantId: merchant.id, role: 'OWNER', isActive: true },
+  const staff = await prisma.user.findMany({
+    where: {
+      merchantId: merchant.id,
+      isActive: true,
+      role: {
+        OR: [
+          { isAdmin: true },
+          { grants: { some: { permission: 'orders.manage' } } },
+        ],
+      },
+    },
     select: { email: true },
   });
 
+  const emails = [...new Set(staff.map(s => s.email))];
+  const recipients = emails.length > 0 ? emails : [merchant.email];
   // const recipients = owners.length > 0 ? owners.map((o) => o.email) : [merchant.email];
-  const recipients = ['starlive835@gmail.com', 'nandwere.mn@gmail.com'];
 
   const appBaseUrl = process.env.APP_BASE_URL ?? 'http://localhost:3000';
 

@@ -9,6 +9,30 @@ const transporter = nodemailer.createTransport({
     pass: process.env.GMAIL_APP_PASSWORD,  // Gmail App Password, not your login password
   },
 });
+const esc = (s: unknown) =>
+  String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+
+export async function sendLoginOtpEmail(to: string, otp: string, businessName: string) {
+  await transporter.sendMail({
+    from: `"${businessName}" <${process.env.GMAIL_USER}>`,
+    to,
+    subject: 'Your sign-in code',
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+        <h2 style="color:#1d4ed8;margin-bottom:8px;">${esc(businessName)}</h2>
+        <p style="color:#374151;margin-bottom:24px;">
+          Use the code below to finish signing in. It expires in <strong>10 minutes</strong>.
+        </p>
+        <div style="background:#f3f4f6;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
+          <span style="font-size:40px;font-weight:700;letter-spacing:12px;color:#111827;">${esc(otp)}</span>
+        </div>
+        <p style="color:#6b7280;font-size:14px;">
+          If this wasn't you, someone knows your password. Please change it right away.
+        </p>
+      </div>
+    `,
+  });
+}
 
 export async function sendOtpEmail(to: string, otp: string, businessName: string) {
   await transporter.sendMail({
@@ -17,13 +41,13 @@ export async function sendOtpEmail(to: string, otp: string, businessName: string
     subject: 'Your password reset code',
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
-        <h2 style="color:#1d4ed8;margin-bottom:8px;">${businessName}</h2>
+        <h2 style="color:#1d4ed8;margin-bottom:8px;">${esc(businessName)}</h2>
         <p style="color:#374151;margin-bottom:24px;">
           You requested a password reset. Use the code below — it expires in <strong>15 minutes</strong>.
         </p>
         <div style="background:#f3f4f6;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
           <span style="font-size:40px;font-weight:700;letter-spacing:12px;color:#111827;">
-            ${otp}
+            ${esc(otp)}
           </span>
         </div>
         <p style="color:#6b7280;font-size:14px;">
@@ -79,31 +103,31 @@ export async function sendNewOrderEmail(to: string[], businessName: string, orde
     subject: `New order ${order.orderNumber} — ${formatMoney(order.total, order.currency)}`,
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
-        <h2 style="color:#1d4ed8;margin-bottom:4px;">${businessName}</h2>
+        <h2 style="color:#1d4ed8;margin-bottom:4px;">${esc(businessName)}</h2>
         <p style="color:#6b7280;font-size:14px;margin-top:0;margin-bottom:24px;">New order received — pay on delivery</p>
 
         <div style="background:#f3f4f6;border-radius:12px;padding:20px;margin-bottom:20px;">
           <p style="margin:0 0 4px 0;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Order</p>
-          <p style="margin:0;font-size:20px;font-weight:700;color:#111827;font-family:monospace;">${order.orderNumber}</p>
+          <p style="margin:0;font-size:20px;font-weight:700;color:#111827;font-family:monospace;">${esc(order.orderNumber)}</p>
         </div>
 
         <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
           <tr>
             <td style="color:#6b7280;font-size:14px;padding:4px 0;">Customer</td>
-            <td style="color:#111827;font-size:14px;padding:4px 0;text-align:right;">${order.customerName}</td>
+            <td style="color:#111827;font-size:14px;padding:4px 0;text-align:right;">${esc(order.customerName)}</td>
           </tr>
           <tr>
             <td style="color:#6b7280;font-size:14px;padding:4px 0;">Phone</td>
-            <td style="color:#111827;font-size:14px;padding:4px 0;text-align:right;">${order.customerPhone}</td>
+            <td style="color:#111827;font-size:14px;padding:4px 0;text-align:right;">${esc(order.customerPhone)}</td>
           </tr>
           <tr>
             <td style="color:#6b7280;font-size:14px;padding:4px 0;vertical-align:top;">Deliver to</td>
-            <td style="color:#111827;font-size:14px;padding:4px 0;text-align:right;">${order.deliveryAddress}</td>
+            <td style="color:#111827;font-size:14px;padding:4px 0;text-align:right;">${esc(order.deliveryAddress)}</td>
           </tr>
-          ${order.deliveryNotes ? `
+          ${esc(order.deliveryNotes) ? `
           <tr>
             <td style="color:#6b7280;font-size:14px;padding:4px 0;vertical-align:top;">Notes</td>
-            <td style="color:#111827;font-size:14px;padding:4px 0;text-align:right;">${order.deliveryNotes}</td>
+            <td style="color:#111827;font-size:14px;padding:4px 0;text-align:right;">${esc(order.deliveryNotes)}</td>
           </tr>` : ''}
         </table>
 

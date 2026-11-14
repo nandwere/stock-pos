@@ -1,7 +1,5 @@
 // app/(dashboard)/page.tsx - Main Dashboard with Real Data
 'use client';
-
-import { useEffect, useState } from 'react';
 import {
   ShoppingCart,
   Package,
@@ -20,6 +18,7 @@ import { useRecentSales } from '@/lib/hooks/use-sales';
 import { useLowStockProducts } from '@/lib/hooks/use-products';
 import Link from 'next/link';
 import { SalesChart } from './SalesChart';
+import { useCurrentUser } from '@/lib/hooks/use-users';
 
 // Shared change-indicator, extracted since it's now used by both the sales
 // card and the new profit card instead of being duplicated inline.
@@ -33,12 +32,15 @@ function ChangeBadge({ value }: { value: number | undefined }) {
   );
 }
 
-export default function Dashboard({ user }: any) {
+export default function Dashboard() {
+  const { data: me } = useCurrentUser();
+  const can = (p: string) => !!me && (me.isSuperAdmin || me.permissions.includes(p));
+
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: recentSales = [], isLoading: salesLoading } = useRecentSales(5);
   const { data: lowStockItems = [], isLoading: stockLoading } = useLowStockProducts(4);
 
-  if (statsLoading) {
+  if (statsLoading || !me) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
@@ -78,7 +80,7 @@ export default function Dashboard({ user }: any) {
 
         {/* Today's Profit */}
         {
-          user?.role !== 'CASHIER' &&
+          can('dashboard.financials') &&
           <>
             <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
               <div className="flex items-center justify-between mb-4">
@@ -132,53 +134,59 @@ export default function Dashboard({ user }: any) {
               </div>
             </div>
             {/* Active Workers */}
-            <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <Users className="w-6 h-6 text-green-600" />
+
+            {
+              can('users.view') &&
+              <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-green-100 rounded-lg">
+                    <Users className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Active Workers</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats?.activeWorkers || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">on duty now</p>
                 </div>
               </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Active Workers</p>
-                <p className="text-2xl font-bold text-gray-900">{stats?.activeWorkers || 0}</p>
-                <p className="text-xs text-gray-500 mt-1">on duty now</p>
-              </div>
-            </div>
+            }
           </>
         }
 
         {/* Low Stock Alert */}
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <AlertTriangle className="w-6 h-6 text-orange-600" />
+        {
+          can('products.view') &&
+          <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-orange-100 rounded-lg">
+                <AlertTriangle className="w-6 h-6 text-orange-600" />
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Low Stock Items</p>
+              <p className="text-2xl font-bold text-gray-900">{stats?.lowStockItems || 0}</p>
+              <p className="text-xs text-orange-600 mt-1 font-medium">
+                {(stats?.lowStockItems || 0) > 0 ? 'Requires attention' : 'All good'}
+              </p>
             </div>
           </div>
-          <div>
-            <p className="text-sm text-gray-600 mb-1">Low Stock Items</p>
-            <p className="text-2xl font-bold text-gray-900">{stats?.lowStockItems || 0}</p>
-            <p className="text-xs text-orange-600 mt-1 font-medium">
-              {(stats?.lowStockItems || 0) > 0 ? 'Requires attention' : 'All good'}
-            </p>
-          </div>
-        </div>
+        }
       </div>
+
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
         {/* Recent Sales */}
-        <div className="lg:col-span-2">
-          <RecentSales sales={recentSales} isLoading={salesLoading} />
-        </div>
+        {can('sales.view') && <div className="lg:col-span-2"><RecentSales sales={recentSales} isLoading={salesLoading} /></div>}
 
         {/* Low Stock Items */}
-        <div>
-          <LowStockAlert items={lowStockItems} isLoading={stockLoading} />
-        </div>
+        {can('products.view') && <div><LowStockAlert items={lowStockItems} isLoading={stockLoading} /></div>}
+
       </div>
 
       {/* Sales Chart */}
-      <SalesChart />
+      {can('reports.view') && <SalesChart />}
     </div>
   );
 }

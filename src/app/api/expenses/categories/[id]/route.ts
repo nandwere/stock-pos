@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getActor } from '@/lib/auth';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const cat = await prisma.expenseCategory.findFirst({
-    where: { id: (await params).id, merchantId: session.merchantId },
+    where: { id: (await params).id, merchantId: actor.merchantId },
   });
   if (!cat) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -18,7 +18,7 @@ export async function PATCH(
 
   const updated = await prisma.expenseCategory.update({
     where: { id: (await params).id },
-    data:  { name, description, color },
+    data: { name, description, color },
   });
 
   return NextResponse.json(updated);
@@ -28,13 +28,12 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!['OWNER', 'MANAGER'].includes(session.role))
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
 
   const cat = await prisma.expenseCategory.findFirst({
-    where: { id: (await params).id, merchantId: session.merchantId },
+    where: { id: (await params).id, merchantId: actor.merchantId },
   });
   if (!cat) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 

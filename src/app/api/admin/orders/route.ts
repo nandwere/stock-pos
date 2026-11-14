@@ -3,9 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { OrderError } from '@/lib/orderService';
 import { requireStaffUser } from '@/lib/adminAuth';
+import { hasPermission } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
+    hasPermission('orders.manage')
     const staff = await requireStaffUser(req);
 
     const { searchParams } = req.nextUrl;

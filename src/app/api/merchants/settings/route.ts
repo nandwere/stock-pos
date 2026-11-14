@@ -2,15 +2,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getActor } from '@/lib/auth';
 
 // Returns all settings as a flat { key: value } object
 export async function GET(request: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const rows = await prisma.settings.findMany({
-    where: { merchantId: session.merchantId },
+    where: { merchantId: actor.merchantId },
     select: { key: true, value: true },
   });
 
@@ -22,12 +22,9 @@ export async function GET(request: NextRequest) {
 
 // Accepts a partial { key: value } object and upserts each entry
 export async function PATCH(request: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  if (session.role !== 'OWNER' && session.role !== 'MANAGER') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   try {
     const body: Record<string, string> = await request.json();
@@ -36,9 +33,9 @@ export async function PATCH(request: NextRequest) {
     await Promise.all(
       Object.entries(body).map(([key, value]) =>
         prisma.settings.upsert({
-          where: { merchantId_key: { merchantId: session.merchantId, key } },
+          where: { merchantId_key: { merchantId: actor.merchantId, key } },
           update: { value },
-          create: { merchantId: session.merchantId, key, value },
+          create: { merchantId: actor.merchantId, key, value },
         })
       )
     );

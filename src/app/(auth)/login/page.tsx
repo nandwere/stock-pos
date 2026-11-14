@@ -5,13 +5,36 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ShoppingBag, Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function LoginPage() {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [challenge, setChallenge] = useState<{ id: string; email: string } | null>(null);
+  const [code, setCode] = useState('');
+
+  function done(data: { passwordChangeRequired?: boolean }) {
+    queryClient.clear();
+    router.push(data.passwordChangeRequired ? '/change-password?required=1' : '/');
+    router.refresh();
+  }
+
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    const res = await fetch('/api/auth/verify-2fa', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeId: challenge!.id, code }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setError(data.error || 'Verification failed'); setLoading(false); return; }
+    done(data);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +55,13 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-
+      if (data.twoFactorRequired) {
+        setChallenge({ id: data.challengeId, email: data.maskedEmail });
+        setLoading(false);
+        return;
+      }
+      done(data);
+      queryClient.clear();
       // Redirect to dashboard
       router.push('/');
       router.refresh();
@@ -56,69 +85,85 @@ export default function LoginPage() {
 
         {/* Login Form */}
         <div className="bg-white rounded-lg shadow-lg p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 
-             placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="you@example.com"
-                autoComplete="email"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-4 py-3 border bg-white text-gray-900 placeholder-gray-400 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="••••••••"
-                autoComplete="current-password"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                'Sign In'
+          {challenge ? (
+            <form onSubmit={handleVerify} className="space-y-6">
+              {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>}
+              <p className="text-sm text-gray-600">We emailed a 6-digit code to {challenge.email}.</p>
+              <input value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric" autoComplete="one-time-code" autoFocus required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 text-center text-2xl tracking-[0.5em]"
+                placeholder="000000" />
+              <button type="submit" disabled={loading || code.length !== 6}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400">
+                {loading ? 'Verifying...' : 'Verify'}
+              </button>
+              <button type="button" onClick={() => { setChallenge(null); setCode(''); setError(''); }}
+                className="w-full text-sm text-gray-600 hover:text-gray-900">Back to sign in</button>
+            </form>) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
               )}
-            </button>
-            <div className="text-center">
-              <Link
-                href="/forgot-password"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 
+             placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 border bg-white text-gray-900 placeholder-gray-400 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Forgot your password?
-              </Link>
-            </div>
-          </form>
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
+              </button>
+              <div className="text-center">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Forgot your password?
+                </Link>
+              </div>
+            </form>
+          )}
         </div>
 
         {/* Footer */}

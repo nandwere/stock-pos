@@ -10,14 +10,22 @@ interface ProfileFormProps {
     id: string;
     name: string;
     email: string;
-    role: string;
-  };
+    roleId: string;
+    isActive: boolean;
+    role: {
+      id: string;
+      name: string;
+      level: number;
+      isAdmin: boolean;
+    } | null;
+    isSuperAdmin: boolean;
+  } | null;
 }
 
 export function ProfileForm({ user }: ProfileFormProps) {
   const [formData, setFormData] = useState({
-    name: user.name,
-    email: user.email,
+    name: user?.name || '',
+    email: user?.email || '',
     phone: '',
     bio: '',
   });

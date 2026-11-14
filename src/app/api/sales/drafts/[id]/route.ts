@@ -1,23 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser, getSession } from '@/lib/auth';
+import { getActor, getSession, hasPermission } from '@/lib/auth';
 import { buildDraftItems, validateDraftBody } from '../route';
 
 type Ctx = { params: Promise<{ id: string }> }; // Next 14: { params: { id: string } }, no await
 
 async function authorize(id: string) {
-  const session = await getSession();
-  const user = await getCurrentUser();
-  if (!session || !user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  const actor = await getActor();
+  if (!actor) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
 
   const draft = await prisma.draftSale.findFirst({
-    where: { id, merchantId: session.merchantId },
+    where: { id, merchantId: actor.merchantId },
   });
   if (!draft) return { error: NextResponse.json({ error: 'Draft not found' }, { status: 404 }) };
-  if (user.role === 'CASHIER' && draft.userId !== user.id) {
+  if (await hasPermission('drafts.update') && draft.userId !== actor.userId) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
-  return { session, user, draft };
+  const session = await getSession();
+  if (!session) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  return { session, actor, draft };
 }
 
 export async function PUT(request: NextRequest, { params }: Ctx) {
@@ -32,7 +33,7 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
 
     const ids = body.items.map((i: any) => i.productId);
     const found = await prisma.product.count({
-      where: { id: { in: ids }, merchantId: auth.session!.merchantId },
+      where: { id: { in: ids }, merchantId: auth.actor.merchantId },
     });
     if (found !== new Set(ids).size) {
       return NextResponse.json({ error: 'One or more products not found' }, { status: 404 });

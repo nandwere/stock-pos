@@ -22,7 +22,6 @@ export async function getReportContext(
   const session = await getSession();
   const user = await getCurrentUser();
   if (!session || !user) return fail('Unauthorized', 401);
-  if (user.role !== 'OWNER' && user.role !== 'MANAGER') return fail('Forbidden', 403);
 
   const merchant = await prisma.merchant.findUnique({
     where: { id: session.merchantId },

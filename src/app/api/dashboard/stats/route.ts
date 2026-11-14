@@ -1,28 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser, getSession } from '@/lib/auth';
+import { getActor, getCurrentUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const { merchantId } = session;
+    
     const startTime = Date.now();
-    console.info("[Dashboard] Request received");
 
-    const user = await getCurrentUser();
-
-    if (!user) {
-      // console.warn("[Dashboard] Unauthorized access attempt");
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    // console.info(`[Dashboard] User authenticated: ${user.id}`);
+    const actor = await getActor();
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });    
 
     // Dates
     const today = new Date();
@@ -42,7 +28,7 @@ export async function GET(request: NextRequest) {
     const todaySales = await prisma.sale.aggregate({
       where: {
         createdAt: { gte: today, lt: tomorrow },
-        merchantId,
+        merchantId: actor.merchantId,
       },
       _sum: { total: true },
       _count: true,
@@ -51,7 +37,7 @@ export async function GET(request: NextRequest) {
     const yesterdaySales = await prisma.sale.aggregate({
       where: {
         createdAt: { gte: yesterday, lt: today },
-        merchantId,
+        merchantId: actor.merchantId,
       },
       _sum: { total: true },
     });
@@ -98,7 +84,7 @@ export async function GET(request: NextRequest) {
 
     const todaySaleItems = await prisma.saleItem.findMany({
       where: {
-        sale: { createdAt: { gte: today, lt: tomorrow }, merchantId },
+        sale: { createdAt: { gte: today, lt: tomorrow }, merchantId: actor.merchantId },
       },
       select: {
         quantity: true,
@@ -118,7 +104,7 @@ export async function GET(request: NextRequest) {
 
     const yesterdaySaleItems = await prisma.saleItem.findMany({
       where: {
-        sale: { createdAt: { gte: yesterday, lt: today }, merchantId },
+        sale: { createdAt: { gte: yesterday, lt: today }, merchantId: actor.merchantId },
       },
       select: {
         quantity: true,
@@ -151,7 +137,7 @@ export async function GET(request: NextRequest) {
       where: {
         currentStock: { lte: prisma.product.fields.reorderLevel },
         isActive: true,
-        merchantId,
+        merchantId: actor.merchantId,
       },
     });
 
@@ -159,7 +145,7 @@ export async function GET(request: NextRequest) {
     // Both derive from the same product fetch — combined into one pass
     // instead of querying products twice.
     const products = await prisma.product.findMany({
-      where: { isActive: true, merchantId },
+      where: { isActive: true, merchantId: actor.merchantId },
       select: { currentStock: true, costPrice: true, sellingPrice: true },
     });
 
@@ -176,7 +162,7 @@ export async function GET(request: NextRequest) {
 
     // Active workers
     const activeWorkers = await prisma.user.count({
-      where: { isActive: true, merchantId },
+      where: { isActive: true, merchantId: actor.merchantId },
     });
 
     // Week / Month sales
@@ -187,12 +173,12 @@ export async function GET(request: NextRequest) {
     monthStart.setDate(monthStart.getDate() - 30);
 
     const weekSales = await prisma.sale.aggregate({
-      where: { createdAt: { gte: weekStart, lt: tomorrow }, merchantId },
+      where: { createdAt: { gte: weekStart, lt: tomorrow }, merchantId: actor.merchantId },
       _sum: { total: true },
     });
 
     const monthSales = await prisma.sale.aggregate({
-      where: { createdAt: { gte: monthStart, lt: tomorrow }, merchantId },
+      where: { createdAt: { gte: monthStart, lt: tomorrow }, merchantId: actor.merchantId },
       _sum: { total: true },
     });
 
@@ -212,10 +198,10 @@ export async function GET(request: NextRequest) {
       yesterdaySales: yesterdayTotal,
       weekSales: Number(weekSales._sum.total || 0),
       monthSales: Number(monthSales._sum.total || 0),
-      todayProfit: Number(todayProfit.toFixed(2)),
+      todayProfit: !actor.can('dashboard.financials') ? undefined : Number(todayProfit.toFixed(2)),
       yesterdayProfit: Number(yesterdayProfit.toFixed(2)),
       profitChange: Number(profitChange.toFixed(2)),
-      stockProfit: Number(stockProfit.toFixed(2)),
+      stockProfit: !actor.can('dashboard.financials') ? undefined : Number(stockProfit.toFixed(2)),
     });
 
   } catch (error: any) {

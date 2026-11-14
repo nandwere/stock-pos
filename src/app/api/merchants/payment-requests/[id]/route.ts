@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getActor } from '@/lib/auth';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (session.role !== 'OWNER') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
+  const actor = await getActor();
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  
   const { action, notes } = await request.json();
   if (!['confirm', 'reject'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
@@ -14,7 +13,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const { id } = await params;
   const paymentRequest = await prisma.paymentRequest.findFirst({
-    where: { id: id, merchantId: session.merchantId },
+    where: { id: id, merchantId: actor.merchantId },
   });
 
   if (!paymentRequest) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -30,7 +29,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         data: { status: 'CONFIRMED', notes },
       }),
       prisma.merchant.update({
-        where: { id: session.merchantId },
+        where: { id: actor.merchantId },
         data: { plan: paymentRequest.plan },
       }),
     ]);

@@ -9,6 +9,8 @@ export interface MerchantSettings {
     logoUrl: string;
     currency: string;
     timezone: string;
+    viewerRole?: string
+    isSuperAdmin?: boolean; // Optional field to indicate if the viewer is a platform admin
     // Settings table key-value fields
     tax_rate: string;
     tax_name: string;
@@ -43,7 +45,7 @@ export const DEFAULTS: MerchantSettings = {
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
 
-export function useSettings() {
+export function useSettings({ enabled = true } = {}) {
     return useQuery({
         queryKey: ['settings'],
         queryFn: async (): Promise<MerchantSettings> => {
@@ -52,6 +54,7 @@ export function useSettings() {
             return res.json();
         },
         staleTime: 60_000,
+        enabled: enabled,
     });
 }
 

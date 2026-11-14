@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getActor } from '@/lib/auth';
 
 // Keys stored in the Settings table (everything else is on the Merchant row)
 const SETTING_KEYS = [
@@ -15,17 +15,18 @@ const SETTING_KEYS = [
 // Returns a flat object: merchant fields + settings key-value pairs merged together
 
 export async function GET(request: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  console.log('GET /api/settings for merchantId:', session.merchantId);
-
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!actor.can('settings.edit')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
   const [merchant, settings] = await Promise.all([
     prisma.merchant.findUnique({
-      where: { id: session.merchantId },
+      where: { id: actor.merchantId },
       select: { name: true, phone: true, email: true, address: true, logoUrl: true, currency: true, timezone: true },
     }),
     prisma.settings.findMany({
-      where: { merchantId: session.merchantId },
+      where: { merchantId: actor.merchantId },
       select: { key: true, value: true },
     }),
   ]);
@@ -35,18 +36,17 @@ export async function GET(request: NextRequest) {
   // Flatten settings array into object
   const settingsMap = Object.fromEntries(settings.map(s => [s.key, s.value]));
 
-  return NextResponse.json({ ...merchant, ...settingsMap });
+  return NextResponse.json({ ...merchant, ...settingsMap, viewerRole: actor.role });
 }
 
 // ── PUT /api/settings ─────────────────────────────────────────────────────────
 // Splits the payload: merchant fields → Merchant table, the rest → Settings table
 
 export async function PUT(request: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Only OWNERs and MANAGERs can change settings
-  if (!['OWNER', 'MANAGER'].includes(session.role)) {
+  if (!actor.can('settings.edit')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -69,16 +69,16 @@ export async function PUT(request: NextRequest) {
     await prisma.$transaction([
       // 1. Update merchant row
       prisma.merchant.update({
-        where: { id: session.merchantId },
+        where: { id: actor.merchantId },
         data: merchantUpdate,
       }),
 
       // 2. Upsert each setting key
       ...settingsUpserts.map(({ key, value }) =>
         prisma.settings.upsert({
-          where: { merchantId_key: { merchantId: session.merchantId, key } },
+          where: { merchantId_key: { merchantId: actor.merchantId, key } },
           update: { value },
-          create: { merchantId: session.merchantId, key, value },
+          create: { merchantId: actor.merchantId, key, value },
         })
       ),
     ]);

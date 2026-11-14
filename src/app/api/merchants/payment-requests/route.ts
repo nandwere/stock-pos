@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getActor, getSession } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  console.log('Session:', session);
-
-  // Only OWNERs on the platform-level can list all merchants.
-  // Adjust this guard to however you model super-admins.
-  if (session.role !== 'OWNER') {
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!actor.can('users.create') && !actor.can('users.edit')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -39,7 +34,7 @@ export async function GET(request: NextRequest) {
       take,
       skip,
       include: {
-       
+
       },
     }),
     prisma.paymentRequest.count({ where }),
@@ -72,10 +67,10 @@ export async function POST(request: NextRequest) {
 
   await prisma.paymentRequest.create({
     data: {
-      merchantId:      session.merchantId,
+      merchantId: session.merchantId,
       plan,
       transactionCode,
-      status:          'PENDING',
+      status: 'PENDING',
     },
   });
 

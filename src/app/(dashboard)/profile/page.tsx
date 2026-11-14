@@ -1,12 +1,12 @@
 // app/(dashboard)/profile/page.tsx
-import { requireAuth } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 import { ProfileForm } from '@/components/profile/ProfileForm';
 import { PasswordChangeForm } from '@/components/profile/PasswordChangeForm';
 import { ActivityLog } from '@/components/profile/ActivityLog';
 import { User, Shield, Activity, Bell } from 'lucide-react';
 
 export default async function ProfilePage() {
-  const user = await requireAuth();
+  const user = await getCurrentUser();
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -24,25 +24,25 @@ export default async function ProfilePage() {
           {/* Avatar */}
           <div className="flex-shrink-0">
             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-3xl font-bold">
-              {user.name.charAt(0).toUpperCase()}
+              {user?.name?.charAt(0).toUpperCase()}
             </div>
           </div>
 
           {/* User Info */}
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-900">{user.name}</h2>
-            <p className="text-gray-600 mt-1">{user.email}</p>
+            <h2 className="text-2xl font-bold text-gray-900">{user?.name}</h2>
+            <p className="text-gray-600 mt-1">{user?.email}</p>
             
             <div className="flex items-center gap-4 mt-4">
               <div className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                {user.role.replace('_', ' ')}
+                {user?.role?.name || 'User'}
               </div>
               <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                user.isActive 
+                user?.isActive 
                   ? 'bg-green-100 text-green-800' 
                   : 'bg-red-100 text-red-800'
               }`}>
-                {user.isActive ? 'Active' : 'Inactive'}
+                {user?.isActive ? 'Active' : 'Inactive'}
               </div>
             </div>
           </div>
@@ -76,7 +76,7 @@ export default async function ProfilePage() {
               </div>
             </div>
             <div className="p-6">
-              <ProfileForm user={user} />
+              <ProfileForm user={user || null} />
             </div>
           </div>
 
@@ -91,7 +91,7 @@ export default async function ProfilePage() {
               </div>
             </div>
             <div className="p-6">
-              <PasswordChangeForm userId={user.id} />
+              <PasswordChangeForm userId={user?.id || ''} />
             </div>
           </div>
 
@@ -106,7 +106,7 @@ export default async function ProfilePage() {
               </div>
             </div>
             <div className="p-6">
-              <ActivityLog userId={user.id} />
+              <ActivityLog userId={user?.id || ''} />
             </div>
           </div>
         </div>
@@ -124,7 +124,7 @@ export default async function ProfilePage() {
               </div>
             </div>
             <div className="p-6">
-              <NotificationSettings userId={user.id} />
+              <NotificationSettings userId={user?.id || ''} />
             </div>
           </div>
 

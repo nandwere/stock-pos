@@ -13,45 +13,37 @@ import {
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/stock-calculations';
 import { useUserStore } from '@/lib/stores/user-store';
-// import { useToast } from '@/lib/hooks/use-toast';
-import { UserRole } from '@/types';
-import { useCreateUser } from '@/lib/hooks/use-users';
+import { useCreateUser, useCurrentUser } from '@/lib/hooks/use-users';
+import { useToast } from '../ui/toast-provider';
+import { useAssignableRoles } from '@/lib/hooks/use-permissions';
 
 interface FormData {
   name: string,
   email: string,
-  role: UserRole,
+  roleId: string;
   isActive: boolean;
   password: string;
 }
 
-const ROLES = [
-  {
-    label: "Cashier",
-    value: 'CASHIER',
-  },
-  {
-    label: "Manager",
-    value: 'MANAGER',
-  }
-];
-
 export default function AddUserPage() {
+  const { data: currentUser } = useCurrentUser();
   const router = useRouter();
   const createUser = useCreateUser();
-  // const { toast } = useToast();
+  const { toast } = useToast();
   const addUser = useUserStore(state => state.addUser);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
 
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
-    role: 'CASHIER',
+    roleId: '',
     isActive: true,
     password: ''
   });
+
+  const { data: roles } = useAssignableRoles(currentUser?.merchantId || undefined);
+
 
   const [showMarginWarning, setShowMarginWarning] = useState(false);
 
@@ -67,8 +59,8 @@ export default function AddUserPage() {
       newErrors.email = 'Email is required';
     }
 
-    if (!formData.role) {
-      newErrors.role = 'Role is required';
+    if (!formData.roleId.trim()) {
+      newErrors.roleId = 'Role is required';
     }
 
     if (!formData.password) {
@@ -83,12 +75,11 @@ export default function AddUserPage() {
     e.preventDefault();
 
     if (!validateForm()) {
-      alert('Invalid form');
-      // toast({
-      //   title: 'Validation Error',
-      //   description: 'Please check the form for errors',
-      //   type: 'destructive'
-      // });
+      toast({
+        title: 'Validation Error',
+        description: 'Please check the form for errors',
+        variant: 'destructive'
+      });
       return;
     }
 
@@ -99,7 +90,7 @@ export default function AddUserPage() {
         id: Date.now().toString(),
         name: formData.name,
         isActive: formData.isActive,
-        role: formData.role,
+        roleId: formData.roleId,
         email: formData.email,
         password: formData.password,
         createdAt: new Date().toISOString(),
@@ -109,11 +100,11 @@ export default function AddUserPage() {
 
       createUser.mutateAsync(newUser)
 
-      // toast({
-      //   title: 'User Added',
-      //   description: `${formData.name} has been added successfully`,
-      //   type: 'default'
-      // });
+      toast({
+        title: 'User Added',
+        description: `${formData.name} has been added successfully`,
+        variant: 'default'
+      });
 
       // Redirect to inventory list
       router.push('/settings');
@@ -121,11 +112,11 @@ export default function AddUserPage() {
 
     } catch (error) {
       console.error('Error adding product:', error);
-      // toast({
-      //   title: 'Error',
-      //   description: 'Failed to add product. Please try again.',
-      //   type: 'destructive'
-      // });
+      toast({
+        title: 'Error',
+        description: 'Failed to add product. Please try again.',
+        variant: 'destructive'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -140,6 +131,10 @@ export default function AddUserPage() {
     }
   };
 
+  function set<K extends keyof FormData>(key: K, value: FormData[K]) {
+    setFormData(f => ({ ...f, [key]: value }));
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -153,7 +148,7 @@ export default function AddUserPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Add New User</h1>
-            <p className="text-gray-600 mt-1">Add a new product to your inventory</p>
+            <p className="text-gray-600 mt-1">Add a new user to your system</p>
           </div>
         </div>
       </div>
@@ -177,7 +172,7 @@ export default function AddUserPage() {
                     onChange={(e) => handleChange('name', e.target.value)}
                     className={`w-full px-4 py-2 text-gray-900 placeholder-gray-400 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.name ? 'border-red-500' : 'border-gray-300'
                       }`}
-                    placeholder="e.g., Wireless Headphones"
+                    placeholder="e.g., John Doe"
                   />
                   {errors.name && (
                     <p className="text-sm text-red-600 flex items-center gap-1">
@@ -200,7 +195,7 @@ export default function AddUserPage() {
                     onChange={(e) => handleChange('email', e.target.value)}
                     className={`w-full px-4 py-2 border text-gray-900 placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-500' : 'border-gray-300'
                       }`}
-                    placeholder="e.g., PRO-1234"
+                    placeholder="e.g., john.doe@example.com"
                   />
                   {errors.email && (
                     <p className="text-sm text-red-600 flex items-center gap-1">
@@ -216,21 +211,16 @@ export default function AddUserPage() {
                   <label className="block text-sm font-medium text-gray-700">
                     Role *
                   </label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => handleChange('role', e.target.value)}
-                    className={`w-full px-4 py-2 border rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.role ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                  >
-                    <option value="">Select a category</option>
-                    {ROLES.map(category => (
-                      <option key={category.value} value={category.value}>{category.label}</option>
-                    ))}
+                  <select value={formData.roleId} onChange={e => handleChange('roleId', e.target.value)} required
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option key={''} value={''}>Select a role</option>
+                    {(roles ?? []).map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
-                  {errors.role && (
+                  {errors.roleId && (
                     <p className="text-sm text-red-600 flex items-center gap-1">
                       <AlertCircle className="w-4 h-4" />
-                      {errors.role}
+                      {errors.roleId}
                     </p>
                   )}
                 </div>

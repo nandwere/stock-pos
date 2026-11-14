@@ -1,122 +1,36 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import {
-  Users, Plus, Edit, Trash2, Loader2,
-  ShieldCheck, ShieldAlert, User, Search, X, Eye, EyeOff
+  Users, Plus, Edit, Trash2, Loader2, Search, X, Eye, EyeOff
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCreateUser, useDeleteUser, useUpdateUser, useUsers } from '@/lib/hooks/use-users';
-
-type UserRole = 'OWNER' | 'MANAGER' | 'CASHIER';
+import { useCreateUser, useDeleteUser, useUpdateUser, useUsers, useCurrentUser } from '@/lib/hooks/use-users';
+import { useMerchants } from '@/lib/hooks/use-merchants';
+import { Merchant } from '@/types';
+import { useAssignableRoles } from '@/lib/hooks/use-permissions';
 
 interface StaffUser {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  isActive: boolean;
-  createdAt: string;
+  id: string; name: string; email: string; isActive: boolean; createdAt: string; isSuperAdmin: boolean;
+  role: { id: string; name: string; level: number; isSuperAdmin: boolean };
   merchant: { id: string; name: string } | null;
 }
 
 interface UserFormData {
   name: string;
   email: string;
-  role: UserRole;
+  roleId: string;
   password: string;
   isActive: boolean;
+  merchantId: string;
+  isSuperAdmin: boolean;
 }
-
-// ── Hooks ──────────────────────────────────────────────────────────
-
-// function useUsers() {
-//   return useQuery({
-//     queryKey: ['users'],
-//     queryFn: async () => {
-//       const res = await fetch('/api/users');
-//       if (!res.ok) throw new Error('Failed to fetch users');
-//       return res.json() as Promise<StaffUser[]>;
-//     },
-//   });
-// }
-
-// function useCreateUser() {
-//   const queryClient = useQueryClient();
-//   return useMutation({
-//     mutationFn: async (data: UserFormData) => {
-//       const res = await fetch('/api/users', {
-//         method: 'POST',
-//         headers: { 'Content-Type': 'application/json' },
-//         body: JSON.stringify(data),
-//       });
-//       if (!res.ok) {
-//         const err = await res.json();
-//         throw new Error(err.error || 'Failed to create user');
-//       }
-//       return res.json();
-//     },
-//     onSuccess: () => {
-//       queryClient.invalidateQueries({ queryKey: ['users'] });
-//       toast.success('User created successfully');
-//     },
-//     onError: (err: Error) => toast.error(err.message),
-//   });
-// }
-
-// function useUpdateUser() {
-//   const queryClient = useQueryClient();
-//   return useMutation({
-//     mutationFn: async ({ id, ...data }: Partial<UserFormData> & { id: string }) => {
-//       const res = await fetch(`/api/users/${id}`, {
-//         method: 'PATCH',
-//         headers: { 'Content-Type': 'application/json' },
-//         body: JSON.stringify(data),
-//       });
-//       if (!res.ok) {
-//         const err = await res.json();
-//         throw new Error(err.error || 'Failed to update user');
-//       }
-//       return res.json();
-//     },
-//     onSuccess: () => {
-//       queryClient.invalidateQueries({ queryKey: ['users'] });
-//       toast.success('User updated');
-//     },
-//     onError: (err: Error) => toast.error(err.message),
-//   });
-// }
-
-// function useDeleteUser() {
-//   const queryClient = useQueryClient();
-//   return useMutation({
-//     mutationFn: async (id: string) => {
-//       const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-//       if (!res.ok) {
-//         const err = await res.json();
-//         throw new Error(err.error || 'Failed to delete user');
-//       }
-//     },
-//     onSuccess: () => {
-//       queryClient.invalidateQueries({ queryKey: ['users'] });
-//       toast.success('User removed');
-//     },
-//     onError: (err: Error) => toast.error(err.message),
-//   });
-// }
-
-// ── Role helpers ───────────────────────────────────────────────────
-
-const ROLE_CONFIG: Record<UserRole, { label: string; color: string; icon: React.ReactNode }> = {
-  OWNER: { label: 'Owner', color: 'bg-purple-100 text-purple-800', icon: <ShieldCheck className="w-3 h-3" /> },
-  MANAGER: { label: 'Manager', color: 'bg-blue-100 text-blue-800', icon: <ShieldAlert className="w-3 h-3" /> },
-  CASHIER: { label: 'Cashier', color: 'bg-gray-100 text-gray-700', icon: <User className="w-3 h-3" /> },
-};
 
 // ── User Form Modal ────────────────────────────────────────────────
 
-const EMPTY_FORM: UserFormData = { name: '', email: '', role: 'CASHIER', password: '', isActive: true };
+const EMPTY_FORM: UserFormData = { name: '', email: '', roleId: '', password: '', isActive: true, merchantId: '', isSuperAdmin: false };
+
+const roleBadge = (r: StaffUser['role']) => r.isSuperAdmin ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800';
 
 function UserFormModal({
   user,
@@ -127,27 +41,42 @@ function UserFormModal({
 }) {
   const isEdit = !!user;
   const [form, setForm] = useState<UserFormData>(
-    user ? { name: user.name, email: user.email, role: user.role, password: '', isActive: user.isActive }
+    user ? { name: user.name, email: user.email, roleId: user.role.id, password: '', isActive: user.isActive, merchantId: user.merchant?.id || '', isSuperAdmin: user.role.isSuperAdmin }
       : EMPTY_FORM
   );
   const [showPassword, setShowPassword] = useState(false);
+  const { data: currentUser } = useCurrentUser();
 
   const { mutate: create, isPending: creating } = useCreateUser();
   const { mutate: update, isPending: updating } = useUpdateUser();
+  const { data: merchants = [], isLoading } = useMerchants();
   const isPending = creating || updating;
+  const { data: roles } = useAssignableRoles(form.merchantId || undefined);
+
+  console.log('Is super admin:', currentUser, 'Form merchantId:', form.merchantId, 'Roles:', roles);
 
   function set<K extends keyof UserFormData>(key: K, value: UserFormData[K]) {
     setForm(f => ({ ...f, [key]: value }));
   }
 
+  useEffect(() => {
+    if (!roles?.length) return;
+    if (!roles.some(r => r.id === form.roleId)) set('roleId', roles[roles.length - 1].id); // lowest level
+  }, [roles]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (isEdit) {
-      // Don't send empty password on edit
-      const payload = form.password ? { id: user.id, ...form } : { id: user.id, name: form.name, email: form.email, role: form.role, isActive: form.isActive };
-      update({ id: user.id, data: payload }, { onSuccess: onClose });
-    } else {
-      create(form, { onSuccess: onClose });
+    try {
+      e.preventDefault();
+      if (isEdit) {
+        // Don't send empty password on edit
+        const payload = form.password ? { id: user.id, ...form } : { id: user.id, name: form.name, email: form.email, roleId: form.roleId, isActive: form.isActive, merchantId: form.merchantId };
+        update({ id: user.id, data: payload }, { onSuccess: onClose });
+      } else {
+        create(form, { onSuccess: onClose });
+      }
+    } catch (error) {
+      console.error('Error submitting user form:', error);
+      toast.error('An error occurred while submitting the form. Please try again.');
     }
   }
 
@@ -190,16 +119,37 @@ function UserFormModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
-            <select
-              value={form.role}
-              onChange={e => set('role', e.target.value as UserRole)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="CASHIER">Cashier</option>
-              <option value="MANAGER">Manager</option>
-              <option value="OWNER">Owner</option>
+            <select value={form.roleId} onChange={e => set('roleId', e.target.value)} required
+              disabled={isEdit && user?.id === currentUser?.id}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+              {(roles ?? []).map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </div>
+          {currentUser?.isSuperAdmin && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Merchant</label>
+              <select
+                value={form.merchantId}
+                onChange={e => set('merchantId', e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="" disabled>Select merchant…</option>
+                {merchants.map((m: Merchant) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {merchants && (
+            <label className="flex items-center gap-3 text-sm text-gray-700">
+              <input type="checkbox" checked={form.isSuperAdmin}
+                disabled={isEdit && user?.id === currentUser?.id}
+                onChange={e => set('isSuperAdmin', e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded border-gray-300" />
+              Super Admin (platform-wide access)
+            </label>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -280,6 +230,10 @@ export default function UsersPage() {
       deleteUser(user.id);
     }
   }
+  const byRole = users.reduce<Record<string, number>>((acc, u: StaffUser) => {
+    acc[u.role.name] = (acc[u.role.name] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div className="p-6 space-y-6">
@@ -305,18 +259,12 @@ export default function UsersPage() {
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4">
-        {(['OWNER', 'MANAGER', 'CASHIER'] as UserRole[]).map(role => {
-          const count = users.filter((u: { role: string; }) => u.role === role).length;
-          const cfg = ROLE_CONFIG[role];
-          return (
-            <div key={role} className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-3">
-              <span className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${cfg.color}`}>
-                {cfg.icon}{cfg.label}s
-              </span>
-              <span className="text-2xl font-bold text-gray-900">{count}</span>
-            </div>
-          );
-        })}
+        {Object.entries(byRole).map(([name, count]) => (
+          <div key={name} className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-3">
+            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">{name}</span>
+            <span className="text-2xl font-bold text-gray-900">{count}</span>
+          </div>
+        ))}
       </div>
 
       {/* Search */}
@@ -359,7 +307,6 @@ export default function UsersPage() {
                 </tr>
               ) : (
                 filtered.map(user => {
-                  const cfg = ROLE_CONFIG[user.role];
                   return (
                     <tr key={user.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
@@ -373,14 +320,17 @@ export default function UsersPage() {
                           </div>
                         </div>
                       </td>
-                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full ${cfg.color}`}>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-700`}>
                           {user.merchant?.name || 'N/A'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full ${cfg.color}`}>
-                          {cfg.icon}{cfg.label}
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full ${roleBadge(user.role)}`}>
+                          {user.role.name}
+                          {user.isSuperAdmin && (
+                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-800">Super Admin</span>
+                          )}
                         </span>
                       </td>
                       <td className="px-6 py-4">

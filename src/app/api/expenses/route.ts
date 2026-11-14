@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getActor, getSession } from '@/lib/auth';
 
 function generateExpenseNumber(): string {
   const ts  = Date.now().toString(36).toUpperCase();
@@ -75,10 +75,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!['OWNER', 'MANAGER'].includes(session.role))
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const actor = await getActor();
+    if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
   const {
@@ -96,8 +94,8 @@ export async function POST(request: NextRequest) {
 
   const expense = await prisma.expense.create({
     data: {
-      merchantId:   session.merchantId,
-      userId:       session.userId,
+      merchantId:   actor.merchantId,
+      userId:       actor.userId,
       expenseNumber,
       description,
       type,

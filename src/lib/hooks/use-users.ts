@@ -21,17 +21,18 @@ async function fetchMerchantsUsers() {
 
 async function fetchUserById(id: string) {
   const response = await fetch(`/api/users/${id}`);
-  if (!response.ok) throw new Error('Failed to fetch product');
+  if (!response.ok) throw new Error('Failed to fetch user');
   return response.json();
 }
 
 async function createUser(data: any) {
+  console.log('Creating user with data:', data);
   const response = await fetch('/api/users', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!response.ok) throw new Error('Failed to create product');
+  if (!response.ok) throw new Error('Failed to create user');
   return response.json();
 }
 
@@ -41,7 +42,7 @@ async function updateUser({ id, data }: { id: string; data: any }) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!response.ok) throw new Error('Failed to update product');
+  if (!response.ok) throw new Error('Failed to update user');
   return response.json();
 }
 
@@ -49,7 +50,7 @@ async function deleteUser(id: string) {
   const response = await fetch(`/api/users/${id}`, {
     method: 'DELETE',
   });
-  if (!response.ok) throw new Error('Failed to delete product');
+  if (!response.ok) throw new Error('Failed to delete user');
   return response.json();
 }
 
@@ -68,6 +69,20 @@ export function useUsers() {
   });
 }
 
+export function useCurrentUser() {
+  return useQuery<{ id: string; isSuperAdmin: boolean,isAdmin: boolean, permissions: string[], merchantId: string }>({
+    queryKey: ['me'],
+    queryFn: async () => {
+      const res = await fetch('/api/me');
+      if (!res.ok) throw new Error('Failed to fetch current user');
+      const data = await res.json();
+      return {id: data.id, isSuperAdmin: data.isSuperAdmin, isAdmin: data.isAdmin, permissions: data.permissions, merchantId: data.merchantId};
+    },
+    staleTime: Infinity,
+    refetchOnMount: 'always',
+  });
+}
+
 /**
  * Fetch all merchants user
  */
@@ -83,7 +98,7 @@ export function useMerchantsUsers() {
 }
 
 /**
- * Fetch single product by ID
+ * Fetch single user by ID
  */
 export function useUser(id: string) {
   return useQuery({
@@ -94,7 +109,7 @@ export function useUser(id: string) {
 }
 
 /**
- * Create new product
+ * Create new user
  */
 export function useCreateUser() {
   const queryClient = useQueryClient();

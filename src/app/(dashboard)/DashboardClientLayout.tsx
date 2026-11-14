@@ -8,13 +8,14 @@ import { ToastProvider } from '@/components/ui/toast-provider';
 import type { User } from '@/types';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { CurrentUser } from '@/lib/auth';
 
 export default function DashboardClientLayout({
     children,
     user,
 }: {
     children: React.ReactNode;
-    user: User;
+    user: CurrentUser | null;
 }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 

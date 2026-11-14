@@ -1,5 +1,5 @@
 // app/(dashboard)/layout.tsx (SERVER)
-import { requireAuth } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 import DashboardClientLayout from './DashboardClientLayout';
 
 export default async function DashboardLayout({
@@ -7,7 +7,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireAuth();
+  const user = await getCurrentUser();
 
   return (
     <DashboardClientLayout user={user}>

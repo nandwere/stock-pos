@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Building2, Search, Plus, Edit, Trash2,
   CheckCircle, XCircle, MoreVertical, Globe,

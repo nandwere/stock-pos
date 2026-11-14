@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession, hasPermission } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
+import { createDefaultRoles } from '@/lib/permissions.server';
+import { getActor } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  console.log('Session:', session);
-
-  // Only OWNERs on the platform-level can list all merchants.
-  // Adjust this guard to however you model super-admins.
-  if (session.role !== 'OWNER') {
+  if (!actor.can('merchants.manage')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -52,18 +49,16 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  if (session.role !== 'OWNER') {
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!actor.can('merchants.manage')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   try {
     const body = await request.json();
     const { name, slug, email, phone, address, currency, timezone, plan, isActive,
-      ownerName, ownerEmail, ownerPassword,
-    } = body;
+      ownerName, ownerEmail, ownerPassword } = body;
 
     if (!name || !slug || !email) {
       return NextResponse.json({ error: 'name, slug and email are required' }, { status: 400 });
@@ -75,37 +70,36 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(ownerPassword, 10);
 
-    // Atomic: merchant + owner user created together or not at all
     const { merchant, owner } = await prisma.$transaction(async (tx) => {
       const merchant = await tx.merchant.create({
-        data: { name, slug, email, phone, address, currency, timezone, plan, isActive: Boolean(isActive) },
+        data: { name, slug, email, phone, address, currency, timezone, plan, isActive: isActive ?? true },
       });
-
+      // Roles first, so the first user can be given the Admin role
+      const roleIds = await createDefaultRoles(tx, merchant.id);
       const owner = await tx.user.create({
         data: {
           merchantId: merchant.id,
           name: ownerName,
           email: ownerEmail,
           password: hashedPassword,
-          role: 'MANAGER', // Default to MANAGER since OWNER is reserved for platform-level admins
+          roleId: roleIds.admin,   // merchant's locked, full-access role
         },
-        select: { id: true, name: true, email: true, role: true },
+        select: {
+          id: true, name: true, email: true,
+          role: { select: { id: true, name: true } },
+        },
       });
 
       return { merchant, owner };
-    });
-
+    }, { timeout: 15_000 });       // default is 5s, and creating roles and grants is several inserts
     return NextResponse.json({ merchant, owner }, { status: 201 });
   } catch (error: any) {
     if (error.code === 'P2002') {
-      const target = error.meta?.target ?? [];
-      const field = target.includes('slug') ? 'slug'
-        : target.includes('email') ? 'email'
-          : 'field';
-      return NextResponse.json(
-        { error: `A merchant with this ${field} already exists` },
-        { status: 409 }
-      );
+      const target: string[] = error.meta?.target ?? [];
+      const msg = target.includes('slug') ? 'A merchant with this slug already exists'
+        : target.some(t => t.includes('email')) ? 'That email is already in use (merchant or owner)'
+          : 'Duplicate value';
+      return NextResponse.json({ error: msg }, { status: 409 });
     }
     console.error('POST /api/merchants', error);
     return NextResponse.json({ error: 'Failed to create merchant' }, { status: 500 });

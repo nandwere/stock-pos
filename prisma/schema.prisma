@@ -14,10 +14,55 @@ datasource db {
   provider = "postgresql"
 }
 
-enum UserRole {
-  OWNER
-  MANAGER
-  CASHIER
+model Role {
+  id           String   @id @default(cuid())
+  merchantId   String
+  key          String                    // slug, unique per merchant
+  name         String
+  description  String?
+  level        Int      @default(10)     // 1–99 custom, 100 = Admin
+  isAdmin Boolean  @default(false)  // full access, locked
+  isSystem     Boolean  @default(false)  // seeded, can't be deleted
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  merchant Merchant    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  users    User[]
+  grants   RoleGrant[]
+
+  @@unique([merchantId, key])
+  @@index([merchantId])
+}
+
+model RoleGrant {
+  roleId     String
+  permission String
+  role       Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permission])
+}
+
+model PermissionGroup {
+  id          String       @id @default(cuid())
+  key         String       @unique
+  label       String
+  sortOrder   Int          @default(0)
+  isSystem    Boolean      @default(false) // seeded groups can't be deleted
+  permissions Permission[]
+}
+
+model Permission {
+  id           String          @id @default(cuid())
+  key          String          @unique      // what hasPermission('...') checks
+  label        String
+  groupId      String
+  sortOrder    Int             @default(0)
+  isSystem     Boolean         @default(false) // seeded permissions can't be deleted
+  group        PermissionGroup @relation(fields: [groupId], references: [id])
+  adminOnly  Boolean  @default(false)
+  defaultRoleKeys String[] @default([])
+
+  @@index([groupId])
 }
 
 enum TransactionType {
@@ -95,6 +140,7 @@ model Merchant {
   stockMovements StockMovement[]
   priceHistory   PriceHistory[]
   salePayments SalePayment[]
+  roles Role[]
 
   @@index([slug])
   @@index([email])
@@ -106,11 +152,15 @@ model User {
   merchantId String
   email      String   @unique
   name       String
-  role       UserRole @default(CASHIER)
+  isSuperAdmin Boolean @default(false)
+  roleId          String?
+  role      Role?   @relation(fields: [roleId], references: [id])
   password   String
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  passwordChangedAt  DateTime @default(now())
+  mustChangePassword Boolean  @default(false)
 
   merchant         Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   sales            Sale[]
@@ -127,7 +177,7 @@ model User {
   // Email unique per merchant, not globally
   @@unique([merchantId, email])
   @@index([merchantId])
-  @@index([merchantId, role])
+  @@index([merchantId, roleId])
   @@index([email])
 }
 
@@ -347,9 +397,12 @@ model OtpCode {
   expiresAt  DateTime
   usedAt     DateTime?
   createdAt  DateTime  @default(now())
-
+  purpose  String @default("RESET")   // existing forgot-password rows stay "RESET"
+  attempts Int    @default(0)
+  
   merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
+  @@index([email, merchantId, purpose])
   @@index([email, merchantId])
   @@index([code])
 }

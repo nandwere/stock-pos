@@ -1,4 +1,4 @@
-import { prisma } from '../src/lib/prisma';
+import { prisma } from '../../src/lib/prisma';
 import bcrypt from 'bcryptjs';
 
 async function main() {
@@ -37,7 +37,6 @@ async function main() {
       email: 'nandwere@baraka.com',
       name: 'Nandwere Owner',
       password: hashedPassword,
-      role: 'OWNER',
     },
   });
   console.log(`✔ Owner: ${owner.name} (${owner.id})`);
@@ -141,26 +140,26 @@ async function main() {
   console.log('✔ Default settings seeded');
 
   // ── Expense Categories ───────────────────────────────────────────────────────
-const expenseCategoryDefs = [
-  { id: 'ecat_salaries',   name: 'Salaries & Wages',      color: '#6366f1', isSystem: true },
-  { id: 'ecat_rent',       name: 'Rent & Utilities',      color: '#f59e0b', isSystem: true },
-  { id: 'ecat_supplies',   name: 'Office Supplies',        color: '#3b82f6', isSystem: true },
-  { id: 'ecat_travel',     name: 'Travel & Transport',     color: '#ec4899', isSystem: true },
-  { id: 'ecat_stock',      name: 'Stock Purchases',        color: '#8b5cf6', isSystem: true },
-  { id: 'ecat_marketing',  name: 'Marketing',              color: '#f97316', isSystem: true },
-  { id: 'ecat_repairs',    name: 'Repairs & Maintenance',  color: '#84cc16', isSystem: true },
-  { id: 'ecat_bank',       name: 'Bank Charges',           color: '#94a3b8', isSystem: true },
-  { id: 'ecat_misc',       name: 'Miscellaneous',          color: '#6b7280', isSystem: true },
-];
+  const expenseCategoryDefs = [
+    { id: 'ecat_salaries', name: 'Salaries & Wages', color: '#6366f1', isSystem: true },
+    { id: 'ecat_rent', name: 'Rent & Utilities', color: '#f59e0b', isSystem: true },
+    { id: 'ecat_supplies', name: 'Office Supplies', color: '#3b82f6', isSystem: true },
+    { id: 'ecat_travel', name: 'Travel & Transport', color: '#ec4899', isSystem: true },
+    { id: 'ecat_stock', name: 'Stock Purchases', color: '#8b5cf6', isSystem: true },
+    { id: 'ecat_marketing', name: 'Marketing', color: '#f97316', isSystem: true },
+    { id: 'ecat_repairs', name: 'Repairs & Maintenance', color: '#84cc16', isSystem: true },
+    { id: 'ecat_bank', name: 'Bank Charges', color: '#94a3b8', isSystem: true },
+    { id: 'ecat_misc', name: 'Miscellaneous', color: '#6b7280', isSystem: true },
+  ];
 
-for (const cat of expenseCategoryDefs) {
-  await prisma.expenseCategory.upsert({
-    where:  { merchantId_name: { merchantId: baraka.id, name: cat.name } },
-    update: {},
-    create: { merchantId: baraka.id, ...cat },
-  });
-}
-console.log(`✔ Expense categories: ${expenseCategoryDefs.length}`);
+  for (const cat of expenseCategoryDefs) {
+    await prisma.expenseCategory.upsert({
+      where: { merchantId_name: { merchantId: baraka.id, name: cat.name } },
+      update: {},
+      create: { merchantId: baraka.id, ...cat },
+    });
+  }
+  console.log(`✔ Expense categories: ${expenseCategoryDefs.length}`);
 
   console.log('\n🌱 Baraka seed complete.');
 

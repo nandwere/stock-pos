@@ -35,8 +35,8 @@ function resolveMerchantSlug(request: NextRequest): string {
 }
 
 // ── Route classification ───────────────────────────────────────────
-const PUBLIC_ROUTES = ['/login', '/forgot-password', '/reset-password', '/store'];
-const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password'];
+const PUBLIC_ROUTES = ['/login', '/forgot-password', '/reset-password', '/change-password', '/store'];
+const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password', '/change-password'];
 
 // ── Middleware ─────────────────────────────────────────────────────
 export async function middleware(request: NextRequest) {
@@ -111,7 +111,7 @@ export async function middleware(request: NextRequest) {
     const response = NextResponse.next();
     response.headers.set('x-merchant-slug', slug);
     response.headers.set('x-user-id', payload.userId);
-    response.headers.set('x-user-role', payload.role);
+    response.headers.set('x-user-role', payload.role.id);
     response.headers.set('x-merchant-plan', payload.plan);
     return response;
 

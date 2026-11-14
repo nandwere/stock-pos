@@ -9,16 +9,18 @@ import {
   Settings, Tag, ShoppingBag, Building2, CreditCard, ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { User } from '@/types';
 import { useSettings } from '@/lib/hooks/use-settings';
 import { useCreditSummary } from '@/lib/hooks/use-credit-summary';
+import type{ CurrentUser } from '@/lib/auth';
+import { useCurrentUser } from '@/lib/hooks/use-users';
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  roles?: ('OWNER' | 'MANAGER' | 'CASHIER')[];
   group?: string;
+  permission?: string;   // shown only if the user holds it
+  adminOnly?: boolean;   // shown only to a merchant's Admin role (and Super Admins)
 }
 
 const groupLabels: Record<string, string> = {
@@ -42,127 +44,132 @@ const navigationItems: NavItem[] = [
     href: '/pos',
     label: 'Point of Sale',
     icon: ShoppingCart,
-    group: 'main'
+    group: 'main',
+    permission: 'sales.create'
   },
   {
     href: '/sales',
     label: 'Sales History',
     icon: ShoppingBag,
-    group: 'main'
+    group: 'main',
+    permission: 'sales.view'
   },
   {
     href: '/sales/credit',
     label: 'Credit Sales',
     icon: CreditCard,
-    group: 'main'
+    group: 'main',
+    permission: 'sales.view'
   },
   {
     href: '/orders',
     label: 'Orders',
     icon: ShoppingBag,
-    group: 'main'
+    group: 'main',
+    permission: 'orders.view'
   },
   {
     href: '/expenses',
     label: 'Expenses',
     icon: ClipboardList,
-    group: 'expenses'
+    group: 'expenses',
+    permission: 'expenses.view'
   },
   {
     href: '/expenses/categories',
     label: 'Exp. Categories',
     icon: Tag,
     group: 'expenses',
-    roles: ['OWNER', 'MANAGER'],
+    permission: 'expenses.create'
   },
   {
     href: '/expenses/summary',
     label: 'Expense Summary',
     icon: BarChart3,
     group: 'expenses',
-    roles: ['OWNER', 'MANAGER'],
+    permission: 'reports.view'
   },
   {
     href: '/inventory',
     label: 'Inventory',
     icon: Package,
-    roles: ['OWNER', 'MANAGER'],
-    group: 'inventory'
+    group: 'inventory',
+    permission: 'products.edit'
   },
   {
     href: '/categories',
     label: 'Categories',
     icon: Tag,
-    roles: ['OWNER', 'MANAGER'],
-    group: 'inventory'
+    group: 'inventory',
+    permission: 'products.edit'
   },
   {
     href: '/stock-count',
     label: 'Stock Count',
     icon: ClipboardList,
-    roles: ['OWNER', 'MANAGER'],
-    group: 'inventory'
+    group: 'inventory',
+    permission: 'stock.adjust'
   },
   {
     href: '/inventory/stock-adjustments',
     label: 'Stock Adjustments',
     icon: ClipboardList,
-    roles: ['OWNER', 'MANAGER'],
-    group: 'inventory'
+    group: 'inventory', 
+    permission: 'stock.adjust'
   },
   {
     href: '/reports/sales',
     label: 'Sales Reports',
     icon: BarChart3,
-    roles: ['OWNER', 'MANAGER'],
-    group: 'reports'
+    group: 'reports',
+    permission: 'reports.view'
   },
   {
     href: '/reports',
     label: 'Reports',
     icon: BarChart3,
-    roles: ['OWNER', 'MANAGER'],
-    group: 'reports'
+    group: 'reports',
+    permission: 'reports.view'
   },
   {
     href: '/payment-requests',
     label: 'Payment Requests',
     icon: ClipboardList,
-    roles: ['OWNER'],
-    group: 'payment'
+    group: 'payment',
+    permission: 'billing.manage',
   },
   {
     href: '/suppliers',
     label: 'Suppliers',
     icon: Building2,
-    roles: ['OWNER', 'MANAGER'],
-    group: 'management'
+    group: 'management',
+    permission: 'suppliers.manage'
   },
   {
     href: '/merchants',
     label: 'Merchants',
     icon: Users,
-    roles: ['OWNER'],
-    group: 'management'
+    group: 'management',
+    permission: 'merchants.manage'
   },
   {
     href: '/users',
     label: 'Users',
     icon: Users,
-    roles: ['OWNER'],
+    permission: 'users.manage',
     group: 'management'
   },
   {
     href: '/settings',
     label: 'Settings',
     icon: Settings,
-    roles: ['OWNER', 'MANAGER'],
-    group: 'management'
+    group: 'management',
+    permission: 'settings.edit'
   },
 ];
 
 interface SidebarProps {
-  user: User;
+  user: CurrentUser | null;
 }
 
 const STORAGE_KEY = 'sidebar-collapsed-groups';
@@ -171,15 +178,20 @@ export function Sidebar({ user }: SidebarProps) {
   const { data } = useSettings();
   const overdueCount = useCreditSummary();
   const pathname = usePathname();
+  const { data: me } = useCurrentUser();
 
   // { [group]: true } = collapsed. Starts empty (everything open) so server
   // and client render the same; the saved state is applied in an effect.
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  const visibleItems = useMemo(
-    () => navigationItems.filter((item) => !item.roles || item.roles.includes(user.role)),
-    [user.role]
-  );
+  const visibleItems = useMemo(() => {
+    if (!me) return [];   // hide the restricted nav until permissions load, rather than flashing it
+    const can = (p: string) => me.isSuperAdmin || me.permissions.includes(p);
+    return navigationItems.filter(item => {
+      if (item.adminOnly) return me.isSuperAdmin || me.isAdmin;
+      return !item.permission || can(item.permission);
+    });
+  }, [me]);
 
   // Group items, preserving the order they're declared in
   const sections = useMemo(() => {
@@ -235,7 +247,7 @@ export function Sidebar({ user }: SidebarProps) {
           </div>
           <div>
             <div className="text-lg font-bold text-gray-900">{data?.name || 'Stock POS'}</div>
-            <div className="text-xs text-gray-500">{user.role}</div>
+            <div className="text-xs text-gray-500">{user?.role.name}</div>
           </div>
         </Link>
       </div>
@@ -326,11 +338,11 @@ export function Sidebar({ user }: SidebarProps) {
       <div className="shrink-0 p-4 border-t border-gray-200">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-            {user.name.charAt(0).toUpperCase()}
+            {user?.name.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
-            <p className="text-xs text-gray-500 truncate">{user.email}</p>
+            <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
+            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
           </div>
         </div>
       </div>
