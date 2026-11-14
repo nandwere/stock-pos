@@ -11,7 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useSettings } from '@/lib/hooks/use-settings';
 import { useCreditSummary } from '@/lib/hooks/use-credit-summary';
-import type{ CurrentUser } from '@/lib/auth';
+import type { CurrentUser } from '@/lib/auth';
 import { useCurrentUser } from '@/lib/hooks/use-users';
 
 interface NavItem {
@@ -114,7 +114,7 @@ const navigationItems: NavItem[] = [
     href: '/inventory/stock-adjustments',
     label: 'Stock Adjustments',
     icon: ClipboardList,
-    group: 'inventory', 
+    group: 'inventory',
     permission: 'stock.adjust'
   },
   {
@@ -156,7 +156,7 @@ const navigationItems: NavItem[] = [
     href: '/users',
     label: 'Users',
     icon: Users,
-    permission: 'users.manage',
+    permission: 'users.view',
     group: 'management'
   },
   {
@@ -183,6 +183,7 @@ export function Sidebar({ user }: SidebarProps) {
   // { [group]: true } = collapsed. Starts empty (everything open) so server
   // and client render the same; the saved state is applied in an effect.
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [hydrated, setHydrated] = useState(false);
 
   const visibleItems = useMemo(() => {
     if (!me) return [];   // hide the restricted nav until permissions load, rather than flashing it
@@ -214,27 +215,42 @@ export function Sidebar({ user }: SidebarProps) {
   const activeGroup = visibleItems.find((i) => i.href === activeHref)?.group ?? null;
 
   // 1) Load saved state
+  // 1) Load saved state, or fall back to "first group open, rest collapsed"
   useEffect(() => {
+    if (hydrated || sections.length === 0) return;   // wait until the nav has loaded
+    let saved: Record<string, boolean> | null = null;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setCollapsed(JSON.parse(raw));
-    } catch {}
-  }, []);
+      if (raw) saved = JSON.parse(raw);
+    } catch { }
+
+    if (saved) {
+      // Groups the user has never seen (e.g. newly granted permission) follow the default
+      const next: Record<string, boolean> = {};
+      sections.forEach(({ group }, i) => {
+        next[group] = group in saved! ? saved![group] : i !== 0;
+      });
+      setCollapsed(next);
+    } else {
+      setCollapsed(Object.fromEntries(sections.map(({ group }, i) => [group, i !== 0])));
+    }
+    setHydrated(true);
+  }, [sections, hydrated]);
 
   // 2) Make sure the group holding the current page is open.
   //    Declared after the load effect so it applies on top of the saved state.
   //    Not persisted: it's a navigation side effect, not a user choice.
   useEffect(() => {
-    if (!activeGroup) return;
-    setCollapsed((prev) => (prev[activeGroup] ? { ...prev, [activeGroup]: false } : prev));
-  }, [activeGroup]);
+  if (!hydrated || !activeGroup) return;
+  setCollapsed((prev) => (prev[activeGroup] ? { ...prev, [activeGroup]: false } : prev));
+}, [activeGroup, hydrated]);
 
   const toggleGroup = (group: string) => {
     const next = { ...collapsed, [group]: !collapsed[group] };
     setCollapsed(next);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {}
+    } catch { }
   };
 
   return (
