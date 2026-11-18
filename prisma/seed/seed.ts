@@ -1,7 +1,26 @@
 import { prisma } from '../../src/lib/prisma';
 import bcrypt from 'bcryptjs';
 
+// Plans must exist before any merchant, because Merchant.plan references Plan.key.
+// Idempotent: re-running never overwrites prices/limits that a super admin has edited.
+const SEED_PLANS = [
+  { key: 'FREE', name: 'Free', description: 'For individuals getting started', price: 0, contactOnly: false, maxProducts: 5, maxUsers: 1,
+    features: ['sales', 'inventory'], color: 'gray', isPopular: false, isDefault: true, sortOrder: 0 },
+  { key: 'STARTER', name: 'Starter', description: 'For small shops', price: 999, contactOnly: false, maxProducts: 200, maxUsers: 3,
+    features: ['sales', 'inventory', 'reports', 'stock_adjustments', 'multi_user'], color: 'blue', isPopular: true, isDefault: false, sortOrder: 1 },
+  { key: 'GROWTH', name: 'Growth', description: 'For growing businesses', price: 2499, contactOnly: false, maxProducts: 1000, maxUsers: 10,
+    features: ['sales', 'inventory', 'reports', 'stock_adjustments', 'shifts', 'exports', 'multi_user'], color: 'purple', isPopular: false, isDefault: false, sortOrder: 2 },
+  { key: 'ENTERPRISE', name: 'Enterprise', description: 'For large operations', price: 0, contactOnly: true, maxProducts: null, maxUsers: null,
+    features: ['sales', 'inventory', 'reports', 'stock_adjustments', 'shifts', 'exports', 'multi_user', 'api_access'], color: 'amber', isPopular: false, isDefault: false, sortOrder: 3 },
+];
+
 async function main() {
+  // 0. Plans
+  for (const p of SEED_PLANS) {
+    await prisma.plan.upsert({ where: { key: p.key }, update: {}, create: p });
+  }
+  console.log(`✔ Plans: ${SEED_PLANS.map(p => p.key).join(', ')}`);
+
   // 1. Create the Baraka merchant (tenant root)
   const baraka = await prisma.merchant.upsert({
     where: { slug: 'baraka' },
@@ -28,13 +47,13 @@ async function main() {
     where: {
       merchantId_email: {
         merchantId: baraka.id,
-        email: 'nandwere@baraka.com',
+        email: 'mnandwere@gmail.com',
       },
     },
     update: {},
     create: {
       merchantId: baraka.id,
-      email: 'nandwere@baraka.com',
+      email: 'mnandwere@gmail.com',
       name: 'Nandwere Owner',
       password: hashedPassword,
     },
@@ -76,7 +95,7 @@ async function main() {
       currentStock: 60, reorderLevel: 2, unit: 'Kg',
     },
     {
-      name: 'Pishori', sku: 'PSI-111', barcode: '5449000000997',
+      name: 'Mwea Pishori', sku: 'PSI-111', barcode: '5449000000997',
       categoryId: rice.id, costPrice: 155, sellingPrice: 170,
       currentStock: 60, reorderLevel: 2, unit: 'Kg',
     },
