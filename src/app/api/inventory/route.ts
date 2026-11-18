@@ -75,17 +75,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { description, name, sku, category, costPrice, sellingPrice, currentStock, reorderLevel, unit, isActive, showOnStorefront, isService } = body;
+    const { description, name, sku, categoryId, costPrice, sellingPrice, currentStock, reorderLevel, unit, isActive, showOnStorefront, isService } = body;
 
     const isServiceItem = Boolean(isService);
 
-    if (!category || !name || costPrice == null || sellingPrice == null || !unit || (!isServiceItem && currentStock == null)) {
+    if (!categoryId || !name || costPrice == null || sellingPrice == null || !unit || (!isServiceItem && currentStock == null)) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
     }
 
     // Verify the category belongs to this merchant before using it
     const categoryRecord = await prisma.category.findFirst({
-      where: { id: category, merchantId },
+      where: { id: categoryId, merchantId },
     });
 
     const merchantRecord = await prisma.merchant.findUnique({
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
           reorderLevel: isServiceItem ? 0 : reorderLevel,
           unit, isActive, showOnStorefront, isService: isServiceItem,
           merchant: { connect: { id: merchantId } },
-          category: { connect: { id: category } },
+          category: { connect: { id: categoryId } },
         },
         select: {
           id: true, sku: true, name: true, costPrice: true, sellingPrice: true,
