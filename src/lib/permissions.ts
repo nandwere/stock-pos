@@ -1,4 +1,4 @@
-export const PLATFORM_PERMISSIONS = ['merchants.manage', 'catalog.manage'];
+export const PLATFORM_PERMISSIONS = ['merchants.manage', 'catalog.manage', 'plans.manage'];
 
 export const DEFAULT_ROLES = [
   { key: 'admin', name: 'Admin', level: 100, isAdmin: true },

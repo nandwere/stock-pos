@@ -25,6 +25,7 @@ import {
 } from '@/lib/hooks/use-permissions';
 import { DEFAULT_ROLE_KEYS } from '@/lib/permissions';
 import { CurrentUser } from '@/lib/auth';
+import { FontSize, ThemeMode, getFontSize, getTheme, setFontSize, setTheme as saveTheme } from '@/lib/theme';
 
 // ── Tabs config ───────────────────────────────────────────────────────────────
 const TABS = [
@@ -804,7 +805,12 @@ function RolesTab() {
 // ── Tab: Appearance ───────────────────────────────────────────────────────────
 
 function AppearanceTab() {
-    const [theme, setTheme] = useState('light');
+    const [theme, setTheme] = useState<ThemeMode>('light');
+    const [fontSize, setFontSizeState] = useState<FontSize>('medium');
+
+    // Stored per browser, so read it after mount
+    useEffect(() => { setTheme(getTheme()); setFontSizeState(getFontSize()); }, []);
+
     return (
         <Section title="Appearance" description="Customize the look and feel of your system">
             <div className="mb-6">
@@ -815,7 +821,7 @@ function AppearanceTab() {
                         { value: 'dark', label: 'Dark', bg: 'from-gray-600 to-gray-900' },
                         { value: 'auto', label: 'Auto', bg: 'from-blue-400 to-gray-800' },
                     ].map(t => (
-                        <button key={t.value} onClick={() => setTheme(t.value)}
+                        <button key={t.value} onClick={() => { const m = t.value as ThemeMode; setTheme(m); saveTheme(m); }}
                             className={`p-3 border-2 rounded-lg text-left transition-colors ${theme === t.value ? 'border-blue-600' : 'border-gray-200 hover:border-gray-300'}`}>
                             <div className={`w-full h-12 bg-gradient-to-br ${t.bg} rounded mb-2`} />
                             <p className="text-xs font-medium text-gray-700">{t.label}</p>
@@ -824,7 +830,7 @@ function AppearanceTab() {
                 </div>
             </div>
             <Field label="Font Size">
-                <Select value="medium" onChange={() => { }} options={[
+                <Select value={fontSize} onChange={(v) => { setFontSizeState(v as FontSize); setFontSize(v as FontSize); }} options={[
                     { value: 'small', label: 'Small' },
                     { value: 'medium', label: 'Medium (Default)' },
                     { value: 'large', label: 'Large' },

@@ -6,7 +6,8 @@ import {
   CheckCircle2, XCircle, Package, X
 } from 'lucide-react';
 import { useHandlePaymentRequest, usePaymentRequests } from '@/lib/hooks/use-payments';
-import { Plan, PLAN_LABELS } from '@/lib/plans';
+import { formatPlanPrice, planColorClass } from '@/lib/plans';
+import { useAdminPlans } from '@/lib/hooks/use-plans';
 import { PaymentRequest } from '@/types';
 
 // ── Summary card ─────────────────────────────────────────────────────────────
@@ -95,6 +96,8 @@ function RejectModal({
 export default function PaymentRequestsPage() {
   const { data: requests = [], isLoading } = usePaymentRequests();
   const { mutate: handle, isPending }      = useHandlePaymentRequest();
+  const { data: plans = [] }               = useAdminPlans();
+  const planByKey = (k: string) => plans.find(p => p.key === k);
 
   const [search, setSearch]       = useState('');
   const [statusFilter, setStatus] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'REJECTED'>('ALL');
@@ -253,14 +256,14 @@ export default function PaymentRequestsPage() {
                   {/* Plan */}
                   <td className="px-5 py-4 whitespace-nowrap">
                     <span className={`inline-block px-2 py-0.5 text-xs font-bold rounded-full
-                      ${PLAN_LABELS[req.plan as Plan]?.color ?? 'bg-gray-100 text-gray-700'}`}>
+                      ${planColorClass(planByKey(req.plan)?.color)}`}>
                       {req.plan}
                     </span>
                   </td>
 
                   {/* Amount */}
                   <td className="px-5 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                    {PLAN_LABELS[req.plan as Plan]?.price ?? '—'}
+                    {planByKey(req.plan) ? formatPlanPrice(planByKey(req.plan)!) : '—'}
                   </td>
 
                   {/* Status */}

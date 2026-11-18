@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession, hasPermission, getCurrentUser } from '@/lib/auth';
 import { recordPriceChange } from '@/lib/stock-history';
+import { guardLimit } from '@/lib/plan-guard';
 
 export async function GET(request: NextRequest) {
   try {
@@ -98,6 +99,9 @@ export async function POST(request: NextRequest) {
     if (!categoryRecord) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 });
     }
+
+    const limitBlock = await guardLimit({ merchantId }, 'maxProducts', await prisma.product.count({ where: { merchantId } }));
+    if (limitBlock) return limitBlock;
 
     const user = await getCurrentUser();
 

@@ -83,11 +83,36 @@ enum PaymentMethod {
   CREDIT
 }
 
-enum MerchantPlan {
-  FREE
-  STARTER
-  GROWTH
-  ENTERPRISE
+// ─────────────────────────────────────────────
+// Plan  (managed by super admins from /plans)
+// ─────────────────────────────────────────────
+// Merchant.plan stores Plan.key, so existing values ('FREE', 'STARTER', ...)
+// keep working. maxProducts / maxUsers: null = unlimited.
+// features holds keys from FEATURES in src/lib/plans.ts.
+
+model Plan {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String   @default("")
+  price       Int      @default(0) // whole currency units per month (KES)
+  contactOnly Boolean  @default(false) // shown as "Contact us", no self-serve payment
+  maxProducts Int?
+  maxUsers    Int?
+  features    String[]
+  color       String   @default("gray")
+  isPopular   Boolean  @default(false)
+  isPublic    Boolean  @default(true) // listed on the merchant /upgrade page
+  isActive    Boolean  @default(true) // can be assigned to merchants
+  isDefault   Boolean  @default(false) // plan given to new merchants
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  merchants       Merchant[]
+  paymentRequests PaymentRequest[]
+
+  @@index([sortOrder])
 }
 
 // ─────────────────────────────────────────────
@@ -104,7 +129,7 @@ model Merchant {
   logoUrl     String?
   currency    String       @default("KES")
   timezone    String       @default("Africa/Nairobi")
-  plan        MerchantPlan @default(FREE)
+  plan        String       @default("FREE")
   isActive    Boolean      @default(true)
   storefrontEnabled  Boolean  @default(false)
   storefrontTagline String?
@@ -121,6 +146,7 @@ model Merchant {
   storefrontHours     String?   // e.g. "Mon–Sat 8am–7pm"
 
   // Relations
+  planConfig        Plan              @relation(fields: [plan], references: [key], onDelete: Restrict)
   users             User[]
   categories        Category[]
   products          Product[]
@@ -416,14 +442,15 @@ enum PaymentStatus {
 model PaymentRequest {
   id              String        @id @default(cuid())
   merchantId      String
-  plan            MerchantPlan
+  plan            String
   transactionCode String        @unique // prevents double-submissions
   status          PaymentStatus @default(PENDING)
   notes           String? // admin can leave a rejection reason
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  planConfig Plan     @relation(fields: [plan], references: [key], onDelete: Restrict)
 
   @@index([merchantId])
   @@index([status])

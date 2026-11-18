@@ -6,15 +6,10 @@ import {
   ArrowLeft, Loader2, Users, Package, TrendingUp,
   CheckCircle, XCircle, Save,
 } from 'lucide-react';
+import { planColorClass } from '@/lib/plans';
+import { useAdminPlans } from '@/lib/hooks/use-plans';
 import { useMerchant, useUpdateMerchant, useToggleMerchant } from '@/lib/hooks/use-merchants';
 
-const PLANS = ['FREE', 'STARTER', 'GROWTH', 'ENTERPRISE'] as const;
-const PLAN_COLORS: Record<string, string> = {
-  FREE: 'bg-gray-100 text-gray-700',
-  STARTER: 'bg-blue-100 text-blue-700',
-  GROWTH: 'bg-purple-100 text-purple-700',
-  ENTERPRISE: 'bg-amber-100 text-amber-700',
-};
 
 const inputCls = `w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white
   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`;
@@ -61,6 +56,7 @@ export default function MerchantEditPage() {
   const { data: merchant, isLoading, error: loadError } = useMerchant(id);
   const update = useUpdateMerchant();
   const toggle = useToggleMerchant();
+  const { data: plans = [] } = useAdminPlans();
 
   const [form, setForm] = useState({
     name: '',
@@ -70,7 +66,7 @@ export default function MerchantEditPage() {
     address: '',
     currency: '',
     timezone: '',
-    plan: 'FREE' as (typeof PLANS)[number],
+    plan: 'FREE' as string,
     deliveryFee: 0,
     storefrontEnabled: false,
     storefrontTagline: '',
@@ -193,7 +189,7 @@ export default function MerchantEditPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-gray-900">{merchant.name}</h1>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PLAN_COLORS[merchant.plan]}`}>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${planColorClass(plans.find(p => p.key === merchant.plan)?.color)}`}>
                 {merchant.plan}
               </span>
             </div>
@@ -301,11 +297,13 @@ export default function MerchantEditPage() {
 
           <Field label="Plan">
             <select value={form.plan} onChange={set('plan')} className={inputCls}>
-              {PLANS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
+              {plans
+                .filter((p) => p.isActive || p.key === form.plan)
+                .map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.name}{p.isActive ? '' : ' (inactive)'}
+                  </option>
+                ))}
             </select>
           </Field>
         </div>

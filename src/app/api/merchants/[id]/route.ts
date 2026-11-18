@@ -10,6 +10,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getActor } from '@/lib/auth';
+import { getPlan, invalidatePlans } from '@/lib/plans.server';
 
 const STRING_FIELDS = ['name', 'slug', 'email', 'phone', 'address', 'currency', 'timezone', 'storefrontTagline'] as const;
 const NULLABLE_STRING_FIELDS = [
@@ -74,6 +76,10 @@ function coerceValue(field: (typeof EDITABLE_FIELDS)[number], raw: unknown): unk
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!actor.can('merchants.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { id } = await params;
 
   const merchant = await prisma.merchant.findUnique({
@@ -91,6 +97,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!actor.can('merchants.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { id } = await params;
   const body = await req.json();
 
@@ -109,6 +119,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
 
+  // A merchant may only be moved onto a plan that exists and is active (it may keep its current one)
+  if (typeof data.plan === 'string') {
+    const current = await prisma.merchant.findUnique({ where: { id }, select: { plan: true } });
+    const target = await getPlan(data.plan);
+    if (!target || (!target.isActive && current?.plan !== target.key)) {
+      return NextResponse.json({ error: 'That plan does not exist or is not active' }, { status: 400 });
+    }
+  }
+
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: 'No editable fields provided' }, { status: 400 });
   }
@@ -121,6 +140,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data,
       include: { _count: { select: { users: true, products: true, sales: true } } },
     });
+    invalidatePlans(); // plan / isActive may have changed
     return NextResponse.json(merchant);
   } catch (err: any) {
     if (err.code === 'P2002') {

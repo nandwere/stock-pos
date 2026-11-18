@@ -1,5 +1,6 @@
 // app/api/stock-counts/reports/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { guardFeature } from '@/lib/plan-guard';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 
@@ -10,6 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const { merchantId } = session;
+    { const blocked = await guardFeature(session, 'reports'); if (blocked) return blocked; }
     // Parse request body
     const body = await request.json();
     const { startDate, endDate } = body;

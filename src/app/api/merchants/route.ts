@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { createDefaultRoles } from '@/lib/permissions.server';
 import { getActor } from '@/lib/auth';
+import { getDefaultPlan, getPlan, invalidatePlans } from '@/lib/plans.server';
 
 export async function GET(request: NextRequest) {
   const actor = await getActor();
@@ -68,11 +69,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'ownerName, ownerEmail and ownerPassword are required' }, { status: 400 });
     }
 
+    const planKey: string = plan || (await getDefaultPlan()).key;
+    const planRow = await getPlan(planKey);
+    if (!planRow || !planRow.isActive) {
+      return NextResponse.json({ error: 'That plan does not exist or is not active' }, { status: 400 });
+    }
+
     const hashedPassword = await bcrypt.hash(ownerPassword, 10);
 
     const { merchant, owner } = await prisma.$transaction(async (tx) => {
       const merchant = await tx.merchant.create({
-        data: { name, slug, email, phone, address, currency, timezone, plan, isActive: isActive ?? true },
+        data: { name, slug, email, phone, address, currency, timezone, plan: planKey, isActive: isActive ?? true },
       });
       // Roles first, so the first user can be given the Admin role
       const roleIds = await createDefaultRoles(tx, merchant.id);

@@ -136,7 +136,14 @@ const navigationItems: NavItem[] = [
     label: 'Payment Requests',
     icon: ClipboardList,
     group: 'payment',
-    permission: 'billing.manage',
+    permission: 'merchants.manage',   // super admin: confirming a payment changes a merchant's plan
+  },
+  {
+    href: '/plans',
+    label: 'Plans',
+    icon: CreditCard,
+    group: 'payment',
+    permission: 'plans.manage',
   },
   {
     href: '/suppliers',

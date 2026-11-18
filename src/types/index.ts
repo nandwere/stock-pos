@@ -1,7 +1,7 @@
 import { CurrentUser } from "@/lib/auth";
 
 export type UserRole = 'OWNER' | 'MANAGER' | 'CASHIER' | 'ADMIN';
-export type MerchantPlan = 'FREE' | 'STARTER' | 'GROWTH' | 'ENTERPRISE';
+export type MerchantPlan = string; // Plan.key, managed at /plans
 
 export interface Merchant {
   id: string;
@@ -31,7 +31,7 @@ export interface PaymentRequest {
   notes?: String;
   createdAt: Date;
   updatedAt: Date;
-  merchant: Merchant;
+  merchant?: { id: string; name: string; slug: string };
 }
 
 

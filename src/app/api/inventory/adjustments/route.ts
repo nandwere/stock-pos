@@ -1,5 +1,6 @@
 // app/api/inventory/adjustments/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { guardFeature } from '@/lib/plan-guard';
 import { getCurrentUser, getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
         const { merchantId } = session;
+    { const blocked = await guardFeature(session, 'stock_adjustments'); if (blocked) return blocked; }
 
         const user = await getCurrentUser();
         if (!user) {
@@ -166,6 +168,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
         const { merchantId } = session;
+    { const blocked = await guardFeature(session, 'stock_adjustments'); if (blocked) return blocked; }
 
         const { searchParams } = new URL(request.url);
         const productId = searchParams.get('productId');

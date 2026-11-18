@@ -252,7 +252,7 @@ export function StorefrontClient({
                   <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">📦</div>
                 )}
                 {outOfStock && (
-                  <span className="absolute top-2 left-2 bg-gray-900/80 text-white text-xs px-2 py-0.5 rounded-full">
+                  <span className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-0.5 rounded-full">
                     Out of stock
                   </span>
                 )}

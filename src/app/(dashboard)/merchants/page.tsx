@@ -7,17 +7,12 @@ import {
   Mail, Phone, CreditCard, Loader2, Crown,
   TrendingUp, Users, Package
 } from 'lucide-react';
+import { planColorClass } from '@/lib/plans';
+import { useAdminPlans } from '@/lib/hooks/use-plans';
 import { useCreateMerchant, useMerchants, useToggleMerchant } from '@/lib/hooks/use-merchants';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-const PLANS = ['FREE', 'STARTER', 'GROWTH', 'ENTERPRISE'] as const;
-const PLAN_COLORS: Record<string, string> = {
-  FREE: 'bg-gray-100 text-gray-700',
-  STARTER: 'bg-blue-100 text-blue-700',
-  GROWTH: 'bg-purple-100 text-purple-700',
-  ENTERPRISE: 'bg-amber-100 text-amber-700',
-};
 
 interface Merchant {
   id: string;
@@ -28,7 +23,7 @@ interface Merchant {
   address?: string;
   currency: string;
   timezone: string;
-  plan: 'FREE' | 'STARTER' | 'GROWTH' | 'ENTERPRISE';
+  plan: string;
   isActive: boolean;
   trialEndsAt?: string;
   createdAt: string;
@@ -42,6 +37,7 @@ interface Merchant {
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function MerchantsPage() {
   const { data: merchants = [], isLoading } = useMerchants();
+  const { data: plans = [] } = useAdminPlans();
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
 
@@ -71,11 +67,11 @@ export default function MerchantsPage() {
 
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {PLANS.map(plan => {
-          const count = merchants.filter((m: { plan: string; }) => m.plan === plan).length;
+        {plans.map(plan => {
+          const count = merchants.filter((m: { plan: string; }) => m.plan === plan.key).length;
           return (
-            <div key={plan} className="bg-white p-4 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-500 mb-1">{plan}</p>
+            <div key={plan.key} className="bg-white p-4 rounded-lg border border-gray-200">
+              <p className="text-sm text-gray-500 mb-1">{plan.name}</p>
               <p className="text-2xl font-bold text-gray-900">{count}</p>
             </div>
           );
@@ -137,6 +133,8 @@ export default function MerchantsPage() {
 // ── Table row ──────────────────────────────────────────────────────
 
 function MerchantRow({ merchant: m }: { merchant: Merchant }) {
+  const { data: plans = [] } = useAdminPlans();
+  const planInfo = plans.find(p => p.key === m.plan);
   const toggle = useToggleMerchant();
 
   return (
@@ -152,8 +150,8 @@ function MerchantRow({ merchant: m }: { merchant: Merchant }) {
         </div>
       </td>
       <td className="px-6 py-4">
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${PLAN_COLORS[m.plan]}`}>
-          {m.plan}
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${planColorClass(planInfo?.color)}`}>
+          {planInfo?.name ?? m.plan}
         </span>
       </td>
       <td className="px-6 py-4 text-sm text-gray-600">{m.currency}</td>
@@ -196,11 +194,14 @@ function MerchantRow({ merchant: m }: { merchant: Merchant }) {
 
 function CreateMerchantModal({ onClose }: { onClose: () => void }) {
   const create = useCreateMerchant();
+  const { data: plans = [] } = useAdminPlans();
+  const assignable = plans.filter(p => p.isActive);
+  const defaultKey = plans.find(p => p.isDefault)?.key ?? assignable[0]?.key ?? '';
   const [form, setForm] = useState({
     // Merchant
     name: '', slug: '', email: '', phone: '',
     currency: 'KES', timezone: 'Africa/Nairobi',
-    plan: 'FREE', isActive: 'true',
+    plan: '', isActive: 'true', // '' = the default plan
     // Owner user
     ownerName: '', ownerEmail: '', ownerPassword: '',
   });
@@ -223,7 +224,7 @@ function CreateMerchantModal({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     setError('');
     try {
-      await create.mutateAsync({ ...form });
+      await create.mutateAsync({ ...form, plan: form.plan || defaultKey });
       onClose();
     } catch (err: any) {
       setError(err.message);
@@ -279,9 +280,9 @@ function CreateMerchantModal({ onClose }: { onClose: () => void }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
-              <select value={form.plan} onChange={set('plan')}
+              <select value={form.plan || defaultKey} onChange={set('plan')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                {PLANS.map(p => <option key={p} value={p}>{p}</option>)}
+                {assignable.map(p => <option key={p.key} value={p.key}>{p.name}</option>)}
               </select>
             </div>
           </div>

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hasPermission, getSession, getActor } from '@/lib/auth';
+import { guardLimit } from '@/lib/plan-guard';
 import bcrypt from 'bcryptjs';
 import { outranks } from '@/lib/permissions.server';
 import { validatePassword } from '@/lib/password-policy';
@@ -64,6 +65,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, name, roleId, password, isActive } = body;
     const merchantId = actor.isSuperAdmin ? (body.merchantId || actor.merchantId) : actor.merchantId;
+
+    const limitBlock = await guardLimit({ merchantId }, 'maxUsers', await prisma.user.count({ where: { merchantId, isActive: true } }));
+    if (limitBlock) return limitBlock;
 
     const role = await prisma.role.findFirst({ where: { id: roleId, merchantId } });
     if (!role) return NextResponse.json({ error: 'Role not found for this merchant' }, { status: 400 });

@@ -1,48 +1,40 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { getPlanLimits, hasFeature, Feature, Plan } from '@/lib/plans';
+import { getMerchantAccess } from '@/lib/plans.server';
+import type { Feature } from '@/lib/plans';
 
 interface Session {
   merchantId: string;
-  role: string;
+  role?: unknown;
+  isSuperAdmin?: boolean;
 }
 
 /**
  * Call at the top of any API route that should be gated.
- * Returns a 402 response if the merchant is over limit or missing the feature,
- * or null if the check passes (proceed normally).
+ * Returns a 402 response if the merchant is suspended, past trial, or missing the feature,
+ * or null if the check passes. Reads the live plan from the database, not the session.
  */
 export async function guardFeature(session: Session, feature: Feature): Promise<NextResponse | null> {
-  const merchant = await prisma.merchant.findUnique({
-    where:  { id: session.merchantId },
-    select: { plan: true, isActive: true, trialEndsAt: true },
-  });
+  if (session.isSuperAdmin) return null; // platform super admins are never plan-gated
 
-  if (!merchant?.isActive) {
+  const access = await getMerchantAccess(session.merchantId);
+
+  if (!access?.isActive) {
     return NextResponse.json(
       { error: 'Your workspace is suspended. Contact support.', code: 'SUSPENDED' },
       { status: 402 }
     );
   }
 
-  // Trial expiry check
-  if (merchant.trialEndsAt && new Date(merchant.trialEndsAt) < new Date()) {
+  if (access.trialEndsAt && new Date(access.trialEndsAt) < new Date()) {
     return NextResponse.json(
       { error: 'Your trial has expired. Please upgrade to continue.', code: 'TRIAL_EXPIRED' },
       { status: 402 }
     );
   }
 
-  if (!hasFeature(merchant.plan as Plan, feature)) {
-    const limits = getPlanLimits(merchant.plan as Plan);
+  if (!access.plan.features.includes(feature)) {
     return NextResponse.json(
-      {
-        error:   `This feature requires a higher plan.`,
-        code:    'PLAN_LIMIT',
-        feature,
-        current: merchant.plan,
-        upgrade: true,
-      },
+      { error: 'This feature requires a higher plan.', code: 'PLAN_LIMIT', feature, current: access.plan.key, upgrade: true },
       { status: 402 }
     );
   }
@@ -50,20 +42,20 @@ export async function guardFeature(session: Session, feature: Feature): Promise<
   return null;
 }
 
+/**
+ * `current` is how many the merchant already has. Blocks creating one more once the plan's limit is reached.
+ * A null limit means unlimited.
+ */
 export async function guardLimit(
   session: Session,
   resource: 'maxProducts' | 'maxUsers',
   current: number
 ): Promise<NextResponse | null> {
-  const merchant = await prisma.merchant.findUnique({
-    where:  { id: session.merchantId },
-    select: { plan: true },
-  });
+  const access = await getMerchantAccess(session.merchantId);
+  if (!access) return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
 
-  const limits = getPlanLimits(merchant!.plan as Plan);
-  const limit  = limits[resource];
-
-  if (current >= limit) {
+  const limit = access.plan[resource];
+  if (limit !== null && current >= limit) {
     return NextResponse.json(
       {
         error:   `You've reached the ${resource === 'maxProducts' ? 'product' : 'user'} limit for your plan (${limit}).`,

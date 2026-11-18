@@ -2,17 +2,18 @@
 
 import { useState } from 'react';
 import { Check, Zap, Phone, Copy, CheckCheck, X, Loader2, Receipt } from 'lucide-react';
-import { PLAN_LABELS, PLAN_LIMITS, Plan } from '@/lib/plans';
-
-const PLANS: Plan[] = ['FREE', 'STARTER', 'GROWTH', 'ENTERPRISE'];
+import { FEATURE_NAMES, formatPlanPrice, limitLabel, planColorClass, type PlanConfig } from '@/lib/plans';
+import { usePlans } from '@/lib/hooks/use-plans';
+import { useMeMerchant } from '@/lib/hooks/use-merchants';
 
 const MPESA_NUMBER = '0718 535 456'; // 👈 your M-Pesa number here
 const MPESA_NAME   = 'MARK NANDWERE'; // 👈 the name registered to that number
 
 // ── Payment Modal ────────────────────────────────────────────────────────────
 
-function PaymentModal({ plan, onClose }: { plan: Plan; onClose: () => void }) {
-  const meta = PLAN_LABELS[plan];
+function PaymentModal({ plan: planConfig, onClose }: { plan: PlanConfig; onClose: () => void }) {
+  const plan = planConfig.key;
+  const meta = { label: planConfig.name, color: planColorClass(planConfig.color), price: formatPlanPrice(planConfig) };
   const [code, setCode]       = useState('');
   const [copied, setCopied]   = useState(false);
   const [loading, setLoading] = useState(false);
@@ -181,7 +182,10 @@ function PaymentModal({ plan, onClose }: { plan: Plan; onClose: () => void }) {
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function UpgradePage() {
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<PlanConfig | null>(null);
+  const { data: plans = [], isLoading } = usePlans();
+  const { data: me } = useMeMerchant();
+  const currentPlan: string | undefined = me?.data?.plan;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
@@ -193,15 +197,20 @@ export default function UpgradePage() {
         <p className="text-gray-500 mt-2">Scale as your business grows. Pay via M-Pesa.</p>
       </div>
 
+      {isLoading && (
+        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {PLANS.map(plan => {
-          const meta     = PLAN_LABELS[plan];
-          const limits   = PLAN_LIMITS[plan];
-          const isPopular = plan === 'STARTER';
+        {plans.map(plan => {
+          const meta      = { label: plan.name, color: planColorClass(plan.color), price: formatPlanPrice(plan), description: plan.description };
+          const isPopular = plan.isPopular;
+          const isCurrent = plan.key === currentPlan;
+          const payable   = !plan.contactOnly && plan.price > 0 && !isCurrent;
 
           return (
             <div
-              key={plan}
+              key={plan.key}
               className={`relative bg-white rounded-xl border-2 p-6 flex flex-col gap-4
                 ${isPopular ? 'border-blue-500 shadow-lg' : 'border-gray-200'}`}
             >
@@ -222,31 +231,33 @@ export default function UpgradePage() {
               </div>
 
               <ul className="space-y-2 flex-1">
-                <FeatureLine label={`${limits.maxProducts === Infinity ? 'Unlimited' : limits.maxProducts} products`} />
-                <FeatureLine label={`${limits.maxUsers === Infinity ? 'Unlimited' : limits.maxUsers} user${limits.maxUsers === 1 ? '' : 's'}`} />
-                {limits.features.map(f => (
+                <FeatureLine label={`${limitLabel(plan.maxProducts)} products`} />
+                <FeatureLine label={`${limitLabel(plan.maxUsers)} user${plan.maxUsers === 1 ? '' : 's'}`} />
+                {plan.features.map(f => (
                   <FeatureLine key={f} label={FEATURE_NAMES[f]} />
                 ))}
               </ul>
 
               <button
-                onClick={() => plan !== 'FREE' && plan !== 'ENTERPRISE' && setSelectedPlan(plan)}
+                onClick={() => payable && setSelectedPlan(plan)}
                 className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-colors
-                  ${plan === 'FREE'
+                  ${isCurrent || (!payable && !plan.contactOnly)
                     ? 'border border-gray-200 text-gray-400 cursor-default'
-                    : plan === 'ENTERPRISE'
+                    : plan.contactOnly
                       ? 'border border-gray-300 text-gray-700 hover:bg-gray-50'
                       : isPopular
                         ? 'bg-blue-600 text-white hover:bg-blue-700'
                         : 'border border-blue-300 text-blue-700 hover:bg-blue-50'
                   }`}
-                disabled={plan === 'FREE'}
+                disabled={!payable && !plan.contactOnly}
               >
-                {plan === 'FREE'
-                  ? 'Free plan'
-                  : plan === 'ENTERPRISE'
+                {isCurrent
+                  ? 'Current plan'
+                  : plan.contactOnly
                     ? 'Contact us'
-                    : `Upgrade to ${meta.label}`}
+                    : payable
+                      ? `Upgrade to ${meta.label}`
+                      : `${meta.label} plan`}
               </button>
             </div>
           );
@@ -278,14 +289,3 @@ function FeatureLine({ label }: { label: string }) {
     </li>
   );
 }
-
-const FEATURE_NAMES: Record<string, string> = {
-  sales:             'Sales & POS',
-  inventory:         'Inventory management',
-  reports:           'Reports & analytics',
-  stock_adjustments: 'Stock adjustments',
-  shifts:            'Shift management',
-  exports:           'Data exports',
-  multi_user:        'Multiple users',
-  api_access:        'API access',
-};

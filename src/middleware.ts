@@ -2,7 +2,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { Feature, hasFeature, Plan } from './lib/plans';
+import type { Feature } from './lib/plans';
+import { getMerchantAccess } from './lib/plans.server';
 
 export const runtime = 'nodejs';
 
@@ -103,7 +104,11 @@ export async function middleware(request: NextRequest) {
     )?.[1];
 
     // console.log('Required feature for this route:', requiredFeature);
-    if (requiredFeature && !hasFeature(payload.plan as Plan, requiredFeature)) {
+    // Plan is read live (short cache), not from the JWT: the token's plan is set at
+    // login, so it was stale after any upgrade and was never populated at all.
+    const access = await getMerchantAccess(payload.merchantId);
+    // Super admins are never plan-gated
+    if (requiredFeature && !payload.isSuperAdmin && !access?.plan.features.includes(requiredFeature)) {
       return withSlug(NextResponse.redirect(new URL('/upgrade', request.url)));
     }
 
@@ -112,7 +117,7 @@ export async function middleware(request: NextRequest) {
     response.headers.set('x-merchant-slug', slug);
     response.headers.set('x-user-id', payload.userId);
     response.headers.set('x-user-role', payload.role.id);
-    response.headers.set('x-merchant-plan', payload.plan);
+    response.headers.set('x-merchant-plan', access?.plan.key ?? '');
     return response;
 
   } catch {

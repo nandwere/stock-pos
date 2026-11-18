@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getCurrentUser, getSession } from '@/lib/auth';
 import { addDays, daysBetween, isYmd, todayIn } from './dates';
 import type { Group } from './types';
+import { guardFeature } from '@/lib/plan-guard';
 
 export type ReportCtx = {
   merchantId: string;
@@ -22,6 +23,8 @@ export async function getReportContext(
   const session = await getSession();
   const user = await getCurrentUser();
   if (!session || !user) return fail('Unauthorized', 401);
+  const blocked = await guardFeature(session, 'reports');
+  if (blocked) return { error: blocked };
 
   const merchant = await prisma.merchant.findUnique({
     where: { id: session.merchantId },

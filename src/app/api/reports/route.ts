@@ -1,5 +1,6 @@
 // src/app/api/reports/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { guardFeature } from '@/lib/plan-guard';
 import { prisma } from '@/lib/prisma';
 import { getSalesReport } from '@/lib/reports';
 import { getSession } from '@/lib/auth';
@@ -14,6 +15,7 @@ export async function GET(request: NextRequest) {
       );
     }
     const { merchantId } = session;
+    { const blocked = await guardFeature(session, 'reports'); if (blocked) return blocked; }
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
 
