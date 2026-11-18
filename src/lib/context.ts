@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser, getSession } from '@/lib/auth';
-import { addDays, daysBetween, isYmd, todayIn } from './dates';
-import type { Group } from './types';
 import { guardFeature } from '@/lib/plan-guard';
+import { Group } from './reports/types';
+import { addDays, daysBetween, isYmd, todayIn } from './reports/dates';
 
 export type ReportCtx = {
   merchantId: string;

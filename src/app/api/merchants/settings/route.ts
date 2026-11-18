@@ -1,0 +1,48 @@
+// app/api/merchant/settings/route.ts
+
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { getActor } from '@/lib/auth';
+
+// Returns all settings as a flat { key: value } object
+export async function GET(request: NextRequest) {
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const rows = await prisma.settings.findMany({
+    where: { merchantId: actor.merchantId },
+    select: { key: true, value: true },
+  });
+
+  // Shape: { tax_rate: "16", receipt_footer: "Thank you!", ... }
+  const settings = Object.fromEntries(rows.map(r => [r.key, r.value]));
+
+  return NextResponse.json(settings);
+}
+
+// Accepts a partial { key: value } object and upserts each entry
+export async function PATCH(request: NextRequest) {
+  const actor = await getActor();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+
+  try {
+    const body: Record<string, string> = await request.json();
+
+    // Upsert all keys in parallel
+    await Promise.all(
+      Object.entries(body).map(([key, value]) =>
+        prisma.settings.upsert({
+          where: { merchantId_key: { merchantId: actor.merchantId, key } },
+          update: { value },
+          create: { merchantId: actor.merchantId, key, value },
+        })
+      )
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error saving settings:', error);
+    return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 });
+  }
+}
