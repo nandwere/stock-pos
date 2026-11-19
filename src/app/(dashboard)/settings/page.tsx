@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { parseImageUrl } from '@/lib/image-url';
 import {
     Building2, DollarSign, Bell, Users, Shield,
     Printer, Database, Palette, Save, Upload,
@@ -189,6 +191,49 @@ function SettingsContent() {
 // ── Tab: Business Info ────────────────────────────────────────────────────────
 
 function BusinessInfoTab({ form, set }: TabProps) {
+    const qc = useQueryClient();
+    const fileRef = useRef<HTMLInputElement>(null);
+    const [busy, setBusy] = useState(false);
+    const [logoError, setLogoError] = useState('');
+    const [showLink, setShowLink] = useState(false);
+    const [link, setLink] = useState('');
+
+    // Saved on the server straight away; the form's Save button also sends logoUrl, which then matches.
+    async function sendLogo(init: RequestInit) {
+        setBusy(true);
+        setLogoError('');
+        try {
+            const res = await fetch('/api/settings/logo', init);
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error ?? 'Could not save the logo');
+            set('logoUrl', data.logoUrl ?? '');
+            qc.invalidateQueries({ queryKey: ['settings'] });
+            setShowLink(false);
+            setLink('');
+        } catch (e: any) {
+            setLogoError(e.message);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        e.target.value = ''; // allow choosing the same file again
+        if (!file) return;
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) return setLogoError('Use a PNG, JPG or WebP image');
+        if (file.size > 2 * 1024 * 1024) return setLogoError('Logo must be smaller than 2MB');
+        const body = new FormData();
+        body.append('file', file);
+        sendLogo({ method: 'POST', body });
+    }
+
+    function applyLink() {
+        const parsed = parseImageUrl(link);
+        if ('error' in parsed) return setLogoError(parsed.error);
+        sendLogo({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: parsed.url }) });
+    }
+
     return (
         <Section title="Business Information"
             description="This information appears on receipts and reports">
@@ -220,17 +265,50 @@ function BusinessInfoTab({ form, set }: TabProps) {
             <div className="border-t pt-6 mt-2">
                 <label className="block text-sm font-medium text-gray-700 mb-3">Business Logo</label>
                 <div className="flex items-center gap-4">
-                    <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg
-                          flex items-center justify-center bg-gray-50 overflow-hidden">
+                    <div className="relative w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg
+                          flex items-center justify-center bg-gray-50 overflow-hidden shrink-0">
                         {form.logoUrl
-                            ? <img src={form.logoUrl} alt="logo" className="w-full h-full object-cover" />
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={form.logoUrl} alt="logo" className="w-full h-full object-cover"
+                                onError={() => setLogoError('That image could not be loaded')} />
                             : <Upload className="w-8 h-8 text-gray-400" />}
+                        {busy && (
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <Loader2 className="w-6 h-6 text-white animate-spin" />
+                            </div>
+                        )}
                     </div>
-                    <div>
-                        <button className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 text-sm">
-                            Upload Logo
-                        </button>
-                        <p className="text-xs text-gray-500 mt-2">PNG or JPG, max 2MB</p>
+                    <div className="min-w-0">
+                        <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={onFile} className="hidden" />
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button type="button" disabled={busy} onClick={() => fileRef.current?.click()}
+                                className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 text-sm disabled:opacity-50">
+                                {form.logoUrl ? 'Change logo' : 'Upload Logo'}
+                            </button>
+                            <button type="button" disabled={busy} onClick={() => { setShowLink(v => !v); setLogoError(''); }}
+                                className="px-4 py-2 text-sm text-blue-600 hover:underline">
+                                Use a link
+                            </button>
+                            {form.logoUrl && (
+                                <button type="button" disabled={busy}
+                                    onClick={() => sendLogo({ method: 'DELETE' })}
+                                    className="px-2 py-2 text-sm text-red-600 hover:underline">
+                                    Remove
+                                </button>
+                            )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">PNG, JPG or WebP, max 2MB</p>
+                        {showLink && (
+                            <div className="flex gap-2 mt-2">
+                                <input type="url" value={link} onChange={e => setLink(e.target.value)}
+                                    placeholder="https://example.com/logo.png" className={inputCls} />
+                                <button type="button" disabled={busy} onClick={applyLink}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                                    Use
+                                </button>
+                            </div>
+                        )}
+                        {logoError && <p className="text-xs text-red-600 mt-2">{logoError}</p>}
                     </div>
                 </div>
             </div>

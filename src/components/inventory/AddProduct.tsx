@@ -18,6 +18,7 @@ import { Category } from '@/types';
 import { useToast } from '../ui/toast-provider';
 import Loading from '@/app/(dashboard)/inventory/[id]/edit/loading';
 import { ProductImageUpload } from '@/components/ProductImageUpload';
+import { parseImageUrl } from '@/lib/image-url';
 
 interface FormData {
   name: string;
@@ -48,6 +49,8 @@ export default function AddProductPage() {
   const { data: product, isLoading: isProductLoading } = useProduct(productId);
 
   const isNew = !productId;
+  const [imageLink, setImageLink] = useState('');
+  const imageLinkResult = imageLink.trim() ? parseImageUrl(imageLink) : null;
 
   const { toast } = useToast();
 
@@ -196,6 +199,7 @@ export default function AddProductPage() {
       updatedAt: new Date().toISOString(),
       isService: formData.isService,
       ...(isNew ? { createdAt: new Date().toISOString() } : {}),
+      ...(isNew && imageLinkResult && 'url' in imageLinkResult ? { imageUrl: imageLinkResult.url } : {}),
     };
 
     try {
@@ -660,9 +664,26 @@ export default function AddProductPage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Image</h3>
 
               {isNew ? (
-                <div className="flex items-start gap-3 text-sm text-gray-500 bg-gray-50 rounded-lg p-4">
-                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <span>Save the product first, then come back here to add a photo.</span>
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-700">Image link (optional)</label>
+                  <input
+                    type="url"
+                    value={imageLink}
+                    onChange={(e) => setImageLink(e.target.value)}
+                    placeholder="https://…/photo.jpg"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {imageLinkResult && 'error' in imageLinkResult && (
+                    <p className="text-xs text-red-600">{imageLinkResult.error}</p>
+                  )}
+                  {imageLinkResult && 'url' in imageLinkResult && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imageLinkResult.url} alt="Preview" className="w-32 h-32 rounded-lg object-cover border border-gray-200" />
+                  )}
+                  <div className="flex items-start gap-3 text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
+                    <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>To upload a photo from your device instead, save the product first, then edit it.</span>
+                  </div>
                 </div>
               ) : product ? (
                 <ProductImageUpload

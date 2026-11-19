@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getActor } from '@/lib/auth';
+import { parseImageUrl } from '@/lib/image-url';
 
 // Keys stored in the Settings table (everything else is on the Merchant row)
 const SETTING_KEYS = [
@@ -55,6 +56,12 @@ export async function PUT(request: NextRequest) {
   // Split payload into merchant fields vs settings keys
   const merchantUpdate: Record<string, string> = {};
   const settingsUpserts: { key: string; value: string }[] = [];
+
+  if (typeof body.logoUrl === 'string' && body.logoUrl.trim() !== '') {
+    const parsed = parseImageUrl(body.logoUrl);
+    if ('error' in parsed) return NextResponse.json({ error: `Logo: ${parsed.error}` }, { status: 400 });
+    body.logoUrl = parsed.url;
+  }
 
   for (const [key, value] of Object.entries(body)) {
     if (['name', 'phone', 'email', 'address', 'logoUrl', 'currency', 'timezone'].includes(key)) {

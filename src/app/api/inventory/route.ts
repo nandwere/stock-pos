@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getSession, hasPermission, getCurrentUser } from '@/lib/auth';
 import { recordPriceChange } from '@/lib/stock-history';
 import { guardLimit } from '@/lib/plan-guard';
+import { parseImageUrl } from '@/lib/image-url';
 
 export async function GET(request: NextRequest) {
   try {
@@ -76,6 +77,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { description, name, sku, categoryId, costPrice, sellingPrice, currentStock, reorderLevel, unit, isActive, showOnStorefront, isService } = body;
+    let imageUrl: string | undefined;
+    if (body.imageUrl) {
+      const parsed = parseImageUrl(body.imageUrl);
+      if ('error' in parsed) return NextResponse.json({ error: `Image: ${parsed.error}` }, { status: 400 });
+      imageUrl = parsed.url;
+    }
 
     const isServiceItem = Boolean(isService);
 
@@ -112,6 +119,7 @@ export async function POST(request: NextRequest) {
           currentStock: isServiceItem ? 0 : currentStock,
           reorderLevel: isServiceItem ? 0 : reorderLevel,
           unit, isActive, showOnStorefront, isService: isServiceItem,
+          ...(imageUrl ? { imageUrl } : {}),
           merchant: { connect: { id: merchantId } },
           category: { connect: { id: categoryId } },
         },

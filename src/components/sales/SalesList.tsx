@@ -9,8 +9,10 @@ import { Sale } from '@/types';
 import { useState, useMemo } from 'react';
 
 // ── helpers (unchanged) ──────────────────────────────────────────────────────
+// YYYY-MM-DD from the browser's local date. (toLocaleDateString() depends on the
+// browser's locale, so en-US produced "2026-19-11", which the server could not read.)
 const toDateInput = (d: Date) =>
-    d.toLocaleDateString().slice(0, 10).split('/').reverse().join('-');
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 const todayStart = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const todayEnd = () => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; };
@@ -68,7 +70,8 @@ export function SalesList() {
     // Server now handles filtering (date/payment/product/search) and pagination —
     // `sales.data` is already the correct page of results.
     const filtered: Sale[] = sales?.data ?? [];
-    const totalItems = filtered.reduce((sum: number, s: Sale) => sum + (s.items?.length ?? 0), 0);
+    const totalItems = filtered.reduce(
+        (sum: number, s: Sale) => sum + (s.items?.reduce((q: number, i: any) => q + Number(i.quantity), 0) ?? 0), 0);
     const totalPages = sales?.totalPages ?? 1;
     const totalResults = sales?.total ?? 0;
 
@@ -208,7 +211,7 @@ export function SalesList() {
                 {[
                     { label: 'Sales', value: totalResults.toString(), color: 'text-blue-600' },
                     { label: 'Revenue', value: formatCurrency(sales?.totalRevenue || 0), color: 'text-green-600' },
-                    { label: 'Items Sold', value: (sales?.totalItemsSold ?? totalItems).toString(), color: 'text-purple-600' },
+                    { label: 'Items Sold', value: Number(Number(sales?.totalItemsSold ?? totalItems).toFixed(3)).toLocaleString(), color: 'text-purple-600' },
                 ].map(s => (
                     <div key={s.label} className="bg-white rounded-lg border border-gray-200 shadow p-4">
                         <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>

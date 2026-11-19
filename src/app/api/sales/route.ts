@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { addDays, isYmd, zonedDayStart } from '@/lib/reports/dates';
 import { prisma } from '@/lib/prisma';
 import { generateSaleNumber } from '@/lib/stock-calculations';
 import { getCurrentUser, getSession } from '@/lib/auth';
@@ -245,19 +246,16 @@ export async function GET(request: NextRequest) {
       where.items = { some: { productId } };
     }
     if (startDate || endDate) {
+      if ((startDate && !isYmd(startDate)) || (endDate && !isYmd(endDate))) {
+        return NextResponse.json({ error: 'startDate and endDate must be YYYY-MM-DD' }, { status: 400 });
+      }
+      // Days are the merchant's local days (not UTC): at 01:00 in Nairobi it is still the
+      // previous day in UTC, so UTC boundaries dropped the first hours of every day.
+      const merchant = await prisma.merchant.findUnique({ where: { id: merchantId }, select: { timezone: true } });
+      const tz = merchant?.timezone || 'Africa/Nairobi';
       where.createdAt = {};
-      if (startDate) {
-        const start = new Date(startDate);
-        start.setUTCHours(0, 0, 0, 0);
-        where.createdAt.gte = start;
-        console.log('Start date filter (UTC):', start.toISOString());
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setUTCHours(23, 59, 59, 999);
-        where.createdAt.lte = end;
-        console.log('End date filter (UTC):', end.toISOString());
-      }
+      if (startDate) where.createdAt.gte = zonedDayStart(startDate, tz);
+      if (endDate) where.createdAt.lt = zonedDayStart(addDays(endDate, 1), tz); // end of the day, exclusive
     }
 
     // Declared separately as `any` BEFORE Promise.all — this is what avoids the

@@ -3,7 +3,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, LogOut, User, ChevronDown } from 'lucide-react';
+import { LogOut, User, ChevronDown } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 import { Sidebar } from './Sidebar';
 import { CurrentUser } from '@/lib/auth';
 import { useQueryClient } from '@tanstack/react-query';
@@ -46,10 +47,7 @@ export function Header({ user, onMenuClick, open }: HeaderProps) {
 
       <div className="flex items-center gap-4">
         {/* Notifications */}
-        <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
+        <NotificationBell userId={user?.id} />
 
         {/* User Menu */}
         <div className="relative">

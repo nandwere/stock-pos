@@ -135,39 +135,44 @@ export function POSInterface() {
       <div className="flex-1 flex flex-col">
         {/* Search Bar */}
         <div className="bg-white p-4 border-b">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search products by name, SKU, or barcode..."
-              className="w-full pl-10 pr-4 py-3 text-gray-900 placeholder-gray-400 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              autoFocus
-            />
+          <div className="flex items-stretch gap-3">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search products by name, SKU, or barcode..."
+                className="w-full h-full pl-10 pr-10 py-3 text-gray-900 placeholder-gray-400 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                autoFocus
+              />
 
-            {/* 👇 Clear button — instant reset */}
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            )}
+              {/* 👇 Clear button — instant reset */}
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label="Clear search"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDrafts(true)}
+              className="relative shrink-0 flex items-center justify-center gap-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+            >
+              <FileText className="w-5 h-5" />
+              <span className="hidden sm:inline">Drafts</span>
+              {drafts.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full min-w-5 h-5 px-1 flex items-center justify-center">
+                  {drafts.length}
+                </span>
+              )}
+            </button>
           </div>
-          <button
-            onClick={() => setShowDrafts(true)}
-            className="relative flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
-          >
-            <FileText className="w-5 h-5" />
-            <span className="hidden sm:inline">Drafts</span>
-            {drafts.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                {drafts.length}
-              </span>
-            )}
-          </button>
           {/* 👇 Live result count feedback */}
           {searchQuery.trim() && (
             <p className="text-xs text-gray-500 mt-2 pl-1">
