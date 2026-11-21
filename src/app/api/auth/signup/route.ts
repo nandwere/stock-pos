@@ -3,7 +3,7 @@ import { randomInt } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { createDefaultRoles } from '@/lib/permissions.server';
-import { getSignupPlan } from '@/lib/plans.server';
+import { getDefaultPlan } from '@/lib/plans.server';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 import { validateSignup } from '@/lib/signup';
 import { sendSignupCodeEmail } from '@/lib/email';
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { plan, trialDays } = await getSignupPlan();
+  const { trialDays = 0, ...plan } = await getDefaultPlan();
   const code = String(randomInt(100000, 1000000));
   const hashed = await bcrypt.hash(input.password, 10);
 

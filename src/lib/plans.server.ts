@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/prisma';
 import type { Plan as PlanRow } from '@prisma/client';
 import { FEATURE_KEYS, type Feature, type PlanConfig } from '@/lib/plans';
+import { BillingStateName } from './billing-shared';
 
 // Last-resort config, used only if the Plan table is empty or a merchant points at a
 // plan that no longer exists. Locked down on purpose.
@@ -55,6 +56,13 @@ export interface MerchantAccess {
   plan: PlanConfig;
   isActive: boolean;
   trialEndsAt: Date | null;
+  billing?: {
+    state: BillingStateName | undefined;
+    isTrial: boolean;
+    expiresAt: Date | null;
+    graceEndsAt: Date | null;
+    daysLeft: number | null;
+  };
 }
 
 /** The merchant's live plan. Replaces reading `plan` from the JWT, which could be stale. */

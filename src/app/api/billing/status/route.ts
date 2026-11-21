@@ -15,11 +15,14 @@ export async function GET() {
   const openInvoiceCount = await prisma.invoice.count({ where: { merchantId: actor.merchantId, status: 'OPEN' } });
 
   const view: BillingStatusView = {
-    ...access.billing,
+    state: access.billing?.state || 'active',
+    isTrial: access.billing?.isTrial || false,
+    expiresAt: access?.billing?.expiresAt ? access.billing.expiresAt.toISOString() : null,
+    graceEndsAt: access?.billing?.graceEndsAt ? access.billing.graceEndsAt.toISOString() : null,
+    daysLeft: access?.billing?.daysLeft || null,
     plan: { key: access.plan.key, name: access.plan.name },
-    subscribedPlan: { key: access.subscribedPlan.key, name: access.subscribedPlan.name },
+    subscribedPlan: { key: access.plan.key, name: access.plan.name },
     canManage: actor.can('billing.manage'),
     openInvoiceCount,
-  };
-  return NextResponse.json(view);
+  };  return NextResponse.json(view);
 }

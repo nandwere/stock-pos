@@ -116,7 +116,7 @@ export async function GET() {
     const access = await getMerchantAccess(merchantId);
     const b = access?.billing;
     if (access && b && b.expiresAt && b.state !== 'active') {
-      const what = b.isTrial ? 'free trial' : `${access.subscribedPlan.name} plan`;
+      const what = b.isTrial ? 'free trial' : `${access.plan.name} plan`;
       const on = new Date(b.expiresAt).toLocaleDateString('en-KE', { dateStyle: 'medium', timeZone: 'Africa/Nairobi' });
       items.push({
         key: 'billing', href: '/billing', count: 1,
@@ -124,7 +124,7 @@ export async function GET() {
         title: b.state === 'expiring' ? `Your ${what} ends in ${b.daysLeft} ${b.daysLeft === 1 ? 'day' : 'days'}`
           : b.state === 'grace' ? `Your ${what} has expired` : `You are now on the ${access.plan.name} plan`,
         body: b.state === 'lapsed' ? 'Renew to get your features back' : `Ends ${on}. Renew to avoid interruption`,
-        fingerprint: hash([b.state, b.expiresAt, String(b.daysLeft)]),
+        fingerprint: hash([b.state || 'active', b.expiresAt ? b.expiresAt.toISOString() : '', String(b.daysLeft)]),
       });
     }
   }
