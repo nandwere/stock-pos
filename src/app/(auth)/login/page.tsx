@@ -32,10 +32,11 @@ export default function LoginPage() {
 
   function done(data: { passwordChangeRequired?: boolean }) {
     queryClient.clear();
-    router.push(data.passwordChangeRequired ? '/change-password?required=1' : '/');
-    router.refresh();
+    try {
+      if (businessCode.trim()) localStorage.setItem('pos-business-code', businessCode.trim().toLowerCase());
+    } catch { /* private mode */ }
+    window.location.assign(data.passwordChangeRequired ? '/change-password?required=1' : '/');
   }
-
 
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
