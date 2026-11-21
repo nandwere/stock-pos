@@ -188,7 +188,7 @@ export async function loginUser(
 export async function finishLogin(userId: string, merchantId: string) {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { id: true, email: true, name: true, isSuperAdmin: true, passwordChangedAt: true, mustChangePassword: true, isActive: true },
+    select: { id: true, email: true, name: true, role: { select: { id: true, name: true, level: true, isAdmin: true } }, isSuperAdmin: true, passwordChangedAt: true, mustChangePassword: true, isActive: true },
   });
   const sec = await getSecuritySettings(merchantId);
 
@@ -203,15 +203,15 @@ export async function finishLogin(userId: string, merchantId: string) {
     email: user.email,
     name: user.name,
     isActive: true,
-    isSuperAdmin: user.isSuperAdmin, // will be loaded in getCurrentUser
+    isSuperAdmin: user.isSuperAdmin,
     merchantId,
-    roleId: '', // will be loaded in getCurrentUser
-    role: { id: '', name: '', level: 0, isAdmin: false }, // will be loaded in getCurrentUser
+    roleId: user?.role?.id || '',
+    role: { id: user?.role?.id || '', name: user?.role?.name || '', level: user?.role?.level || 0, isAdmin: user?.role?.isAdmin || false }, // will be loaded in getCurrentUser
   });
   return {
     success: true as const,
     passwordChangeRequired: mustChange,
-    user: { id: user.id, name: user.name, email: user.email, isSuperAdmin: user.isSuperAdmin, merchantId, isActive: user.isActive, roleId: '', role: { id: '', name: '', level: 0, isAdmin: false, } },
+    user: { id: user.id, name: user.name, email: user.email, isSuperAdmin: user.isSuperAdmin, merchantId, isActive: user.isActive, roleId: '', role: { id: user?.role?.id || '', name: user?.role?.name || '', level: user?.role?.level || 0, isAdmin: user?.role?.isAdmin || false, } },
   };
 }
 

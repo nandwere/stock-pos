@@ -44,9 +44,11 @@ export default function LoginPage() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ challengeId: challenge!.id, code }),
     });
+    console.log('verify-2fa response', res);
     const data = await res.json();
     if (!res.ok) { setError(data.error || 'Verification failed'); setLoading(false); return; }
     done(data);
+    setLoading(false);
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
