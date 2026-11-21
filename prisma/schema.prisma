@@ -106,11 +106,13 @@ model Plan {
   isActive    Boolean  @default(true) // can be assigned to merchants
   isDefault   Boolean  @default(false) // plan given to new merchants
   sortOrder   Int      @default(0)
+  trialDays   Int      @default(0) // > 0: new sign-ups start on this plan free for this many days
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   merchants       Merchant[]
   paymentRequests PaymentRequest[]
+  invoices        Invoice[]
 
   @@index([sortOrder])
 }
@@ -134,7 +136,16 @@ model Merchant {
   storefrontEnabled  Boolean  @default(false)
   storefrontTagline String?
   deliveryFee    Decimal @default(0)  @db.Decimal(10, 3)
-  trialEndsAt DateTime?
+  trialEndsAt DateTime? // legacy: superseded by planExpiresAt + planIsTrial
+  // Billing lifecycle. null planExpiresAt = no expiry (free / manually managed plans)
+  planExpiresAt DateTime?
+  planIsTrial   Boolean   @default(false)
+  billingNotice String? // last renewal reminder sent, e.g. "2026-12-01:T-3", so each stage is emailed once
+  // null = a self-signup that has not verified its email yet (inactive until it does)
+  verifiedAt    DateTime?
+  // Which version of the Terms and Conditions the owner accepted at sign-up (null for merchants an admin created)
+  termsAcceptedAt DateTime?
+  termsVersion    String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   storefrontPhone     String?
@@ -147,6 +158,7 @@ model Merchant {
 
   // Relations
   planConfig        Plan              @relation(fields: [plan], references: [key], onDelete: Restrict)
+  invoices          Invoice[]
   users             User[]
   categories        Category[]
   products          Product[]
@@ -449,10 +461,14 @@ model PaymentRequest {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  invoiceId  String?
+
   merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   planConfig Plan     @relation(fields: [plan], references: [key], onDelete: Restrict)
+  invoice    Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@index([merchantId])
+  @@index([invoiceId])
   @@index([status])
   @@index([createdAt])
 }
@@ -815,4 +831,74 @@ model SalePayment {
   @@index([merchantId, saleId])
   @@index([merchantId, createdAt])
   @@index([merchantId, method, createdAt])
+}
+
+// ─────────────────────────────────────────────
+// Platform billing: what a merchant pays us for its plan
+// ─────────────────────────────────────────────
+
+enum InvoiceStatus {
+  OPEN
+  PAID
+  VOID
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  number        String        @unique // INV-2026-0001
+  merchantId    String
+  plan          String // Plan.key
+  planName      String // snapshot, so old invoices keep their wording if the plan is renamed
+  description   String
+  periodMonths  Int           @default(1)
+  amount        Int // whole currency units
+  currency      String        @default("KES")
+  status        InvoiceStatus @default(OPEN)
+  issuedAt      DateTime      @default(now())
+  dueAt         DateTime
+  paidAt        DateTime?
+  receiptNumber String?       @unique // RCT-2026-0001, allocated when paid
+  paymentRef    String? // M-Pesa transaction code
+  periodStart   DateTime? // coverage this payment bought (set when paid)
+  periodEnd     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  merchant        Merchant         @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  planConfig      Plan             @relation(fields: [plan], references: [key], onDelete: Restrict)
+  paymentRequests PaymentRequest[]
+
+  @@index([merchantId, status])
+  @@index([issuedAt])
+}
+
+// Gap-free-ish yearly counters for invoice / receipt numbers, e.g. key "INV-2026"
+model BillingCounter {
+  key   String @id
+  value Int    @default(0)
+}
+
+// ─────────────────────────────────────────────
+// Contact Support form (public /support page)
+// ─────────────────────────────────────────────
+
+enum SupportStatus {
+  OPEN
+  RESOLVED
+}
+
+model SupportRequest {
+  id           String        @id @default(cuid())
+  ref          String        @unique // SUP-2026-0001, shown to the sender
+  name         String
+  email        String
+  businessCode String? // what the sender typed, to help find the account
+  topic        String
+  message      String
+  status       SupportStatus @default(OPEN)
+  merchantId   String? // set when the sender was signed in (taken from the session, not the form)
+  createdAt    DateTime      @default(now())
+  resolvedAt   DateTime?
+
+  @@index([status, createdAt])
 }

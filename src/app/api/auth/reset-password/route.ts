@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { resolveTenantSlug } from '@/lib/tenant';
 
 export async function POST(request: NextRequest) {
-  const { email, code, password } = await request.json();
-  const slug = request.headers.get('x-merchant-slug') ?? 'baraka';
+  const body = await request.json();
+  const { email, code, password } = body;
+  const slug = resolveTenantSlug(request, body) ?? 'baraka';
 
   if (!email || !code || !password) {
     return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
@@ -21,6 +23,7 @@ export async function POST(request: NextRequest) {
       merchantId: merchant.id,
       email,
       code,
+      purpose:   'RESET',   // a sign-up or sign-in code must not reset a password
       usedAt:    null,
       expiresAt: { gt: new Date() },
     },

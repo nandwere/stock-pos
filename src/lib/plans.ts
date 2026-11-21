@@ -62,6 +62,7 @@ export interface PlanConfig {
   isActive: boolean;
   isDefault: boolean;
   sortOrder: number;
+  trialDays?: number; // only on the admin list
   merchantCount?: number; // only on the admin list
 }
 

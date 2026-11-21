@@ -16,6 +16,8 @@ export interface Merchant {
   plan: MerchantPlan;
   isActive: boolean;
   trialEndsAt: Date | null;
+  planExpiresAt: Date | string | null;
+  planIsTrial: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,6 +34,7 @@ export interface PaymentRequest {
   createdAt: Date;
   updatedAt: Date;
   merchant?: { id: string; name: string; slug: string };
+  invoice?: { id: string; number: string; amount: number; currency: string; periodMonths: number; status: string; receiptNumber: string | null } | null;
 }
 
 

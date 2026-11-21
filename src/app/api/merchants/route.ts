@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     const { merchant, owner } = await prisma.$transaction(async (tx) => {
       const merchant = await tx.merchant.create({
-        data: { name, slug, email, phone, address, currency, timezone, plan: planKey, isActive: isActive ?? true },
+        data: { name, slug, email, phone, address, currency, timezone, plan: planKey, isActive: isActive ?? true, verifiedAt: new Date() },
       });
       // Roles first, so the first user can be given the Admin role
       const roleIds = await createDefaultRoles(tx, merchant.id);
@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
           name: ownerName,
           email: ownerEmail,
           password: hashedPassword,
+          mustChangePassword: true,   // the super admin chose the password, so the owner replaces it
           roleId: roleIds.admin,   // merchant's locked, full-access role
         },
         select: {

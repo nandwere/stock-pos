@@ -109,6 +109,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     for (const field of EDITABLE_FIELDS) {
       if (field in body) data[field] = coerceValue(field, body[field]);
     }
+    // Manual grant / extension from the super admin screen (null or '' = no expiry)
+    if ('planExpiresAt' in body) {
+      const raw = body.planExpiresAt;
+      if (raw === null || raw === '') {
+        data.planExpiresAt = null;
+        data.planIsTrial = false;
+      } else {
+        const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(raw)) ? `${raw}T23:59:59Z` : String(raw));
+        if (Number.isNaN(d.getTime())) throw new Error('planExpiresAt is not a valid date');
+        data.planExpiresAt = d;
+        if ('planIsTrial' in body) data.planIsTrial = body.planIsTrial === true;
+      }
+      const before = await prisma.merchant.findUnique({ where: { id }, select: { planExpiresAt: true } });
+      const next = data.planExpiresAt as Date | null;
+      if ((before?.planExpiresAt?.getTime() ?? null) !== (next?.getTime() ?? null)) {
+        data.billingNotice = null; // new date: let the reminders run again
+      }
+    }
     // Lat/lng must be set together or cleared together
     const hasLat = 'storefrontLat' in data;
     const hasLng = 'storefrontLng' in data;

@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, User, ChevronDown } from 'lucide-react';
+import { LifeBuoy, LogOut, User, ChevronDown } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { Sidebar } from './Sidebar';
 import { CurrentUser } from '@/lib/auth';
@@ -95,6 +95,17 @@ export function Header({ user, onMenuClick, open }: HeaderProps) {
                 >
                   <User className="w-4 h-4" />
                   Profile Settings
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    router.push('/support');
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <LifeBuoy className="w-4 h-4" />
+                  Help &amp; support
                 </button>
 
                 <button

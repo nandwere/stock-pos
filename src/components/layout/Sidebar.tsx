@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard, Package, ShoppingCart, ClipboardList, BarChart3, Users,
-  Settings, Tag, ShoppingBag, Building2, CreditCard, ChevronDown,
+  Settings, Tag, ShoppingBag, Building2, CreditCard, ChevronDown, Receipt, LifeBuoy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettings } from '@/lib/hooks/use-settings';
@@ -137,6 +137,20 @@ const navigationItems: NavItem[] = [
     icon: ClipboardList,
     group: 'payment',
     permission: 'merchants.manage',   // super admin: confirming a payment changes a merchant's plan
+  },
+  {
+    href: '/billing',
+    label: 'Billing',
+    icon: Receipt,
+    group: 'payment',
+    permission: 'billing.manage',
+  },
+  {
+    href: '/help-requests',
+    label: 'Support requests',
+    icon: LifeBuoy,
+    group: 'payment',
+    permission: 'merchants.manage',
   },
   {
     href: '/plans',

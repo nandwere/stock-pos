@@ -7,4 +7,10 @@ export function startScheduler() {
       headers: { 'x-cron-secret': process.env.CRON_SECRET! },
     });
   });
+  // Plan renewal reminders, and moving expired plans off paid features
+  cron.schedule('0 7 * * *', async () => {
+    await fetch(`${process.env.APP_URL}/api/cron/billing-reminders`, {
+      headers: { 'x-cron-secret': process.env.CRON_SECRET! },
+    });
+  });
 }

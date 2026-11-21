@@ -1,6 +1,7 @@
 // app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { loginUser } from '@/lib/auth';
+import { resolveTenantSlug } from '@/lib/tenant';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,8 +18,8 @@ export async function POST(request: NextRequest) {
     }
     // console.log("Request Headers:", Object.fromEntries(request.headers.entries()));
 
-    // Resolved by middleware — never comes from the request body
-    const merchantSlug = request.headers.get('x-merchant-slug');
+    // An explicit business code (new merchants) or the host-based slug resolved by the middleware
+    const merchantSlug = resolveTenantSlug(request, body);
     console.log('Login attempt for merchant slug:', merchantSlug);
 
     if (!merchantSlug) {

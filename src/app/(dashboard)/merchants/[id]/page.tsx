@@ -67,6 +67,8 @@ export default function MerchantEditPage() {
     currency: '',
     timezone: '',
     plan: 'FREE' as string,
+    planExpiresAt: '',      // YYYY-MM-DD, empty = never expires
+    planIsTrial: false,
     deliveryFee: 0,
     storefrontEnabled: false,
     storefrontTagline: '',
@@ -93,6 +95,8 @@ export default function MerchantEditPage() {
       currency: merchant.currency ?? '',
       timezone: merchant.timezone ?? '',
       plan: merchant.plan ?? 'FREE',
+      planExpiresAt: merchant.planExpiresAt ? String(merchant.planExpiresAt).slice(0, 10) : '',
+      planIsTrial: merchant.planIsTrial ?? false,
       deliveryFee: merchant.deliveryFee ?? 0,
       storefrontEnabled: merchant.storefrontEnabled ?? false,
       storefrontTagline: merchant.storefrontTagline ?? '',
@@ -308,11 +312,20 @@ export default function MerchantEditPage() {
           </Field>
         </div>
 
-        {merchant.trialEndsAt && (
-          <p className="text-xs text-gray-400">
-            Trial ends {new Date(merchant.trialEndsAt).toLocaleDateString()}
-          </p>
-        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Plan expires">
+            <input type="date" value={form.planExpiresAt}
+              onChange={(e) => setForm((f) => ({ ...f, planExpiresAt: e.target.value }))} className={inputCls} />
+          </Field>
+          <label className="flex items-center gap-2 text-sm text-gray-700 mt-6">
+            <input type="checkbox" checked={form.planIsTrial} disabled={!form.planExpiresAt}
+              onChange={(e) => setForm((f) => ({ ...f, planIsTrial: e.target.checked }))} />
+            This is a free trial
+          </label>
+        </div>
+        <p className="text-xs text-gray-400 -mt-2">
+          Leave empty for a plan that never expires. Paid renewals move this date automatically; set it here to grant or extend manually.
+        </p>
 
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-2">
           Storefront

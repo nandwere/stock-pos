@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendOtpEmail } from '@/lib/email';
+import { resolveTenantSlug } from '@/lib/tenant';
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 export async function POST(request: NextRequest) {
-  const { email } = await request.json();
-  const slug = request.headers.get('x-merchant-slug') ?? 'baraka';
+  const body = await request.json();
+  const { email } = body;
+  const slug = resolveTenantSlug(request, body) ?? 'baraka';
 
   if (!email) return NextResponse.json({ error: 'Email is required' }, { status: 400 });
 

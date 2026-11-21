@@ -15,7 +15,7 @@ const inputCls = `w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-
 const EMPTY: PlanInput & { key: string } = {
   key: '', name: '', description: '', price: 0, contactOnly: false,
   maxProducts: null, maxUsers: null, features: ['sales', 'inventory'], color: 'gray',
-  isPopular: false, isPublic: true, isActive: true, isDefault: false, sortOrder: 0,
+  isPopular: false, isPublic: true, isActive: true, isDefault: false, sortOrder: 0, trialDays: 0,
 };
 
 export default function PlansPage() {
@@ -246,6 +246,11 @@ function PlanModal({ plan, onClose }: { plan: PlanConfig | null; onClose: () => 
                   </button>
                 ))}
               </div>
+            </Field>
+            <Field label="Free trial for new sign-ups (days)" hint="0 = no trial">
+              <input type="number" min={0} max={365} className={inputCls} value={form.trialDays}
+                disabled={form.contactOnly}
+                onChange={e => set('trialDays', Math.min(365, Math.max(0, Math.floor(Number(e.target.value)) || 0)))} />
             </Field>
             <Field label="Display order" hint="lowest first">
               <input type="number" min={0} className={inputCls} value={form.sortOrder}

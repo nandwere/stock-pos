@@ -1,14 +1,14 @@
 // app/api/cron/credit-reminders/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isCronAuthorized } from '@/lib/cron-auth';
 import { PaymentMethod } from '@prisma/client';
 
 // Called by an external scheduler (Vercel Cron, GitHub Actions cron, etc.)
 // — not by any user action — so it's gated by a shared secret rather than
 // a user session.
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

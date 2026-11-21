@@ -1,19 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Zap, Phone, Copy, CheckCheck, X, Loader2, Receipt } from 'lucide-react';
+import { Check, Zap, Phone, Copy, CheckCheck, X, Loader2, Receipt, FileText } from 'lucide-react';
 import { FEATURE_NAMES, formatPlanPrice, limitLabel, planColorClass, type PlanConfig } from '@/lib/plans';
 import { usePlans } from '@/lib/hooks/use-plans';
-import { useMeMerchant } from '@/lib/hooks/use-merchants';
-
-const MPESA_NUMBER = '0718 535 456'; // 👈 your M-Pesa number here
-const MPESA_NAME   = 'MARK NANDWERE'; // 👈 the name registered to that number
+import { useBillingStatus, useCreateInvoice } from '@/lib/hooks/use-billing';
+import { PAY_NAME as MPESA_NAME, PAY_NUMBER as MPESA_NUMBER, PERIOD_OPTIONS, type InvoiceView } from '@/lib/billing-shared';
+import { makeMoney } from '@/lib/receipt-shared';
 
 // ── Payment Modal ────────────────────────────────────────────────────────────
 
-function PaymentModal({ plan: planConfig, onClose }: { plan: PlanConfig; onClose: () => void }) {
-  const plan = planConfig.key;
-  const meta = { label: planConfig.name, color: planColorClass(planConfig.color), price: formatPlanPrice(planConfig) };
+function PaymentModal({ invoice, colorKey, onClose }: { invoice: InvoiceView; colorKey?: string; onClose: () => void }) {
+  const meta = { label: invoice.planName, color: planColorClass(colorKey), price: makeMoney(invoice.currency)(invoice.amount) };
   const [code, setCode]       = useState('');
   const [copied, setCopied]   = useState(false);
   const [loading, setLoading] = useState(false);
@@ -38,7 +36,7 @@ function PaymentModal({ plan: planConfig, onClose }: { plan: PlanConfig; onClose
       const res  = await fetch('/api/merchants/payment-requests', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ plan, transactionCode: code.trim().toUpperCase() }),
+        body:    JSON.stringify({ invoiceId: invoice.id, transactionCode: code.trim().toUpperCase() }),
       });
       const data = await res.json();
       if (!res.ok) return setError(data.error || 'Submission failed');
@@ -60,7 +58,12 @@ function PaymentModal({ plan: planConfig, onClose }: { plan: PlanConfig; onClose
             <h2 className="text-lg font-bold text-gray-900">Pay via M-Pesa</h2>
             <p className="text-sm text-gray-500 mt-0.5">
               Activating <span className={`font-semibold px-1.5 py-0.5 rounded text-xs ${meta.color}`}>{meta.label}</span> plan
+              {' · '}{invoice.periodMonths} {invoice.periodMonths === 1 ? 'month' : 'months'}
             </p>
+            <a href={`/api/billing/invoices/${invoice.id}/pdf?type=invoice`}
+               className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline mt-1">
+              <FileText className="w-3 h-3" /> Invoice {invoice.number}
+            </a>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
             <X className="w-5 h-5" />
@@ -182,10 +185,23 @@ function PaymentModal({ plan: planConfig, onClose }: { plan: PlanConfig; onClose
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function UpgradePage() {
-  const [selectedPlan, setSelectedPlan] = useState<PlanConfig | null>(null);
+  const [invoice, setInvoice] = useState<{ invoice: InvoiceView; color: string } | null>(null);
+  const [months, setMonths] = useState<number>(1);
+  const [error, setError] = useState('');
   const { data: plans = [], isLoading } = usePlans();
-  const { data: me } = useMeMerchant();
-  const currentPlan: string | undefined = me?.data?.plan;
+  const { data: status } = useBillingStatus();
+  const createInvoice = useCreateInvoice();
+  const subscribedKey = status?.subscribedPlan.key;
+
+  async function choose(plan: PlanConfig) {
+    setError('');
+    try {
+      const inv = await createInvoice.mutateAsync({ plan: plan.key, months });
+      setInvoice({ invoice: inv, color: plan.color });
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
@@ -197,6 +213,17 @@ export default function UpgradePage() {
         <p className="text-gray-500 mt-2">Scale as your business grows. Pay via M-Pesa.</p>
       </div>
 
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <span className="text-sm text-gray-500 mr-1">Billing period</span>
+        {PERIOD_OPTIONS.map(m => (
+          <button key={m} onClick={() => setMonths(m)}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium border ${months === m ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
+            {m === 12 ? '12 months' : m === 1 ? '1 month' : `${m} months`}
+          </button>
+        ))}
+      </div>
+      {error && <p className="text-center text-sm text-red-600">{error}</p>}
+
       {isLoading && (
         <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div>
       )}
@@ -205,8 +232,10 @@ export default function UpgradePage() {
         {plans.map(plan => {
           const meta      = { label: plan.name, color: planColorClass(plan.color), price: formatPlanPrice(plan), description: plan.description };
           const isPopular = plan.isPopular;
-          const isCurrent = plan.key === currentPlan;
-          const payable   = !plan.contactOnly && plan.price > 0 && !isCurrent;
+          const subscribed = plan.key === subscribedKey;
+          const renewable  = subscribed && !!status?.expiresAt;               // paid plan with an end date
+          const isCurrent  = subscribed && !renewable;                         // no expiry: nothing to buy
+          const payable    = !plan.contactOnly && plan.price > 0 && !isCurrent;
 
           return (
             <div
@@ -227,6 +256,9 @@ export default function UpgradePage() {
                   {meta.label}
                 </span>
                 <p className="text-2xl font-bold text-gray-900">{meta.price}</p>
+                {payable && months > 1 && (
+                  <p className="text-xs text-gray-500 mt-0.5">{makeMoney('KES')(plan.price * months)} for {months} months</p>
+                )}
                 <p className="text-sm text-gray-500 mt-1">{meta.description}</p>
               </div>
 
@@ -239,7 +271,7 @@ export default function UpgradePage() {
               </ul>
 
               <button
-                onClick={() => payable && setSelectedPlan(plan)}
+                onClick={() => payable && !createInvoice.isPending && choose(plan)}
                 className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-colors
                   ${isCurrent || (!payable && !plan.contactOnly)
                     ? 'border border-gray-200 text-gray-400 cursor-default'
@@ -255,9 +287,11 @@ export default function UpgradePage() {
                   ? 'Current plan'
                   : plan.contactOnly
                     ? 'Contact us'
-                    : payable
-                      ? `Upgrade to ${meta.label}`
-                      : `${meta.label} plan`}
+                    : renewable
+                      ? `Renew ${meta.label}`
+                      : payable
+                        ? `Choose ${meta.label}`
+                        : `${meta.label} plan`}
               </button>
             </div>
           );
@@ -271,10 +305,11 @@ export default function UpgradePage() {
       </p>
 
       {/* Payment modal */}
-      {selectedPlan && (
+      {invoice && (
         <PaymentModal
-          plan={selectedPlan}
-          onClose={() => setSelectedPlan(null)}
+          invoice={invoice.invoice}
+          colorKey={invoice.color}
+          onClose={() => setInvoice(null)}
         />
       )}
     </div>

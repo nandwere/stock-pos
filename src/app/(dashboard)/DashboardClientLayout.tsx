@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { BillingBanner } from '@/components/layout/BillingBanner';
 import { ToastProvider } from '@/components/ui/toast-provider';
 import type { User } from '@/types';
 import { usePathname } from 'next/navigation';
@@ -51,6 +52,7 @@ export default function DashboardClientLayout({
                 />
 
                 <main className="flex-1 overflow-y-auto p-4">
+                    <BillingBanner />
                     <ToastProvider>{children}</ToastProvider>
                 </main>
             </div>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getActor } from '@/lib/auth';
+import { getMerchantAccess } from '@/lib/plans.server';
 
 export type AppNotification = {
   key: string;
@@ -106,6 +107,24 @@ export async function GET() {
         title: `${plural(owing.length, 'credit payment')} due${overdue ? ` (${overdue} overdue)` : ''}`,
         body: `${currency} ${sum.toLocaleString('en-KE', { maximumFractionDigits: 2 })} outstanding`,
         fingerprint: hash(owing.map((s) => s.id)),
+      });
+    }
+  }
+
+  // ── Plan / trial ending ─────────────────────────────────────────────────────
+  if (actor.can('billing.manage')) {
+    const access = await getMerchantAccess(merchantId);
+    const b = access?.billing;
+    if (access && b && b.expiresAt && b.state !== 'active') {
+      const what = b.isTrial ? 'free trial' : `${access.subscribedPlan.name} plan`;
+      const on = new Date(b.expiresAt).toLocaleDateString('en-KE', { dateStyle: 'medium', timeZone: 'Africa/Nairobi' });
+      items.push({
+        key: 'billing', href: '/billing', count: 1,
+        severity: b.state === 'expiring' ? 'warning' : 'danger',
+        title: b.state === 'expiring' ? `Your ${what} ends in ${b.daysLeft} ${b.daysLeft === 1 ? 'day' : 'days'}`
+          : b.state === 'grace' ? `Your ${what} has expired` : `You are now on the ${access.plan.name} plan`,
+        body: b.state === 'lapsed' ? 'Renew to get your features back' : `Ends ${on}. Renew to avoid interruption`,
+        fingerprint: hash([b.state, b.expiresAt, String(b.daysLeft)]),
       });
     }
   }

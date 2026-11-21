@@ -8,6 +8,7 @@ import {
 import { useHandlePaymentRequest, usePaymentRequests } from '@/lib/hooks/use-payments';
 import { formatPlanPrice, planColorClass } from '@/lib/plans';
 import { useAdminPlans } from '@/lib/hooks/use-plans';
+import { makeMoney } from '@/lib/receipt-shared';
 import { PaymentRequest } from '@/types';
 
 // ── Summary card ─────────────────────────────────────────────────────────────
@@ -263,7 +264,14 @@ export default function PaymentRequestsPage() {
 
                   {/* Amount */}
                   <td className="px-5 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                    {planByKey(req.plan) ? formatPlanPrice(planByKey(req.plan)!) : '—'}
+                    {req.invoice
+                      ? <>
+                          {makeMoney(req.invoice.currency)(req.invoice.amount)}
+                          <span className="block text-xs font-normal text-gray-500">
+                            {req.invoice.number} · {req.invoice.periodMonths} {req.invoice.periodMonths === 1 ? 'month' : 'months'}
+                          </span>
+                        </>
+                      : planByKey(req.plan) ? formatPlanPrice(planByKey(req.plan)!) : '—'}
                   </td>
 
                   {/* Status */}

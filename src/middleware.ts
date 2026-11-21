@@ -36,8 +36,9 @@ function resolveMerchantSlug(request: NextRequest): string {
 }
 
 // ── Route classification ───────────────────────────────────────────
-const PUBLIC_ROUTES = ['/login', '/forgot-password', '/reset-password', '/change-password', '/store'];
-const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password', '/change-password'];
+// /support and /terms are public and, unlike the auth pages, stay reachable when signed in
+const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password', '/change-password', '/store', '/support', '/terms'];
+const AUTH_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password', '/change-password'];
 
 // ── Middleware ─────────────────────────────────────────────────────
 export async function middleware(request: NextRequest) {

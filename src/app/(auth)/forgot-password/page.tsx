@@ -7,6 +7,16 @@ import { ShoppingBag, Loader2, ArrowLeft, Mail, KeyRound, Eye, EyeOff, CheckCirc
 
 type Step = 'email' | 'otp' | 'password' | 'done';
 
+// The business code from the sign-in page link, or the one used last on this browser
+function savedBusinessCode(): string | undefined {
+  try {
+    const q = new URLSearchParams(window.location.search).get('business');
+    return (q || localStorage.getItem('pos-business-code') || '').trim().toLowerCase() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function ForgotPasswordPage() {
   const router  = useRouter();
   const [step, setStep]         = useState<Step>('email');
@@ -27,7 +37,7 @@ export default function ForgotPasswordPage() {
       await fetch('/api/auth/forgot-password', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email }),
+        body:    JSON.stringify({ email, businessCode: savedBusinessCode() }),
       });
       // Always advance — don't leak whether email exists
       setStep('otp');
@@ -81,7 +91,7 @@ export default function ForgotPasswordPage() {
       const res  = await fetch('/api/auth/reset-password', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email, code: otp.join(''), password }),
+        body:    JSON.stringify({ email, code: otp.join(''), password, businessCode: savedBusinessCode() }),
       });
       const data = await res.json();
       if (!res.ok) return setError(data.error || 'Reset failed');
