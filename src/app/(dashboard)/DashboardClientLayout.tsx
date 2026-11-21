@@ -6,7 +6,6 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { BillingBanner } from '@/components/layout/BillingBanner';
 import { ToastProvider } from '@/components/ui/toast-provider';
-import type { User } from '@/types';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { CurrentUser } from '@/lib/auth';

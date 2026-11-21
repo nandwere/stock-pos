@@ -79,54 +79,59 @@ export async function middleware(request: NextRequest) {
     return withSlug(NextResponse.redirect(loginUrl));
   }
 
+  // Only an unreadable/expired TOKEN means "signed out". Anything else going wrong below must
+  // never clear the cookie: that is what made sign-in appear to "bounce back to /login" when the
+  // plan lookup failed (for example a database that is missing a new column), with nothing logged.
+  let payload: Awaited<ReturnType<typeof verifyToken>> = null;
   try {
-    const payload = await verifyToken(token);
-
-    // console.log('Middleware auth payload:', payload);
-
-    // Expired or invalid payload → clear cookie, redirect to login
-    if (!payload || new Date(payload.expiresAt) < new Date()) {
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
-      const response = NextResponse.redirect(loginUrl);
-      response.cookies.delete('session');
-      return withSlug(response);
-    }
-
-    // Already authenticated → bounce away from auth routes (e.g. /login)
-    if (AUTH_ROUTES.some(route => pathname.startsWith(route))) {
-      return withSlug(NextResponse.redirect(new URL('/', request.url)));
-    }
-
-    // console.log('Checking feature gate for route:', pathname);
-    // Feature gate check
-    const requiredFeature = Object.entries(FEATURE_GATES).find(([route]) =>
-      pathname.startsWith(route)
-    )?.[1];
-
-    // console.log('Required feature for this route:', requiredFeature);
-    // Plan is read live (short cache), not from the JWT: the token's plan is set at
-    // login, so it was stale after any upgrade and was never populated at all.
-    const access = await getMerchantAccess(payload.merchantId);
-    // Super admins are never plan-gated
-    if (requiredFeature && !payload.isSuperAdmin && !access?.plan.features.includes(requiredFeature)) {
-      return withSlug(NextResponse.redirect(new URL('/upgrade', request.url)));
-    }
-
-    // All good — pass through with slug + user context headers
-    const response = NextResponse.next();
-    response.headers.set('x-merchant-slug', slug);
-    response.headers.set('x-user-id', payload.userId);
-    response.headers.set('x-user-role', payload.role.id);
-    response.headers.set('x-merchant-plan', access?.plan.key ?? '');
-    return response;
-
+    payload = await verifyToken(token);
   } catch {
+    payload = null;
+  }
+
+  // Expired or invalid payload → clear cookie, redirect to login
+  if (!payload || new Date(payload.expiresAt) < new Date()) {
     const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('redirect', pathname);
     const response = NextResponse.redirect(loginUrl);
     response.cookies.delete('session');
     return withSlug(response);
   }
+
+  // Already authenticated → bounce away from auth routes (e.g. /login)
+  if (AUTH_ROUTES.some(route => pathname.startsWith(route))) {
+    return withSlug(NextResponse.redirect(new URL('/', request.url)));
+  }
+
+  const requiredFeature = Object.entries(FEATURE_GATES).find(([route]) =>
+    pathname.startsWith(route)
+  )?.[1];
+
+  // Plan is read live (short cache), not from the JWT: the token's plan is set at login,
+  // so it would be stale after any upgrade.
+  let access: Awaited<ReturnType<typeof getMerchantAccess>> = null;
+  let planLookupFailed = false;
+  try {
+    access = await getMerchantAccess(payload.merchantId);
+  } catch (err) {
+    // Fail open and say so loudly: a plan-lookup problem must not lock everyone out of the app.
+    // (The API routes re-check plan features themselves.)
+    planLookupFailed = true;
+    console.error('[middleware] plan lookup failed, letting the request through:', err);
+  }
+
+  // Super admins are never plan-gated
+  if (requiredFeature && !payload.isSuperAdmin && !planLookupFailed && !access?.plan.features.includes(requiredFeature)) {
+    return withSlug(NextResponse.redirect(new URL('/upgrade', request.url)));
+  }
+
+  // All good — pass through with slug + user context headers
+  const response = NextResponse.next();
+  response.headers.set('x-merchant-slug', slug);
+  response.headers.set('x-user-id', payload.userId);
+  response.headers.set('x-user-role', payload.role.id);
+  response.headers.set('x-merchant-plan', access?.plan.key ?? '');
+  return response;
 }
 
 export const config = {
